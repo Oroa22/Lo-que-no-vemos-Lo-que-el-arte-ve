@@ -1,0 +1,2155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sondear la oscuridad del presente. Lo que no vemos, lo que el arte ve</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Cormorant Garamond (estilo pictórico/museográfico), Cinzel, Inter y JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600;1,700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <!-- Iconos Lucide -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            serif: ['Cormorant Garamond', 'Georgia', 'serif'],
+            art: ['Cormorant Garamond', 'Cinzel', 'Georgia', 'serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    };
+
+    // Funciones globales tempranas para normalización y respaldo de imágenes antes del renderizado del DOM
+    window.normalizeImageUrl = function (url) {
+      if (!url || typeof url !== 'string') return '';
+      const trimmed = url.trim();
+      const driveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+      if (driveMatch && driveMatch[1]) {
+        return 'https://drive.google.com/thumbnail?id=' + driveMatch[1] + '&sz=w1200';
+      }
+      return trimmed;
+    };
+
+    window.handleImgFallback = function (img) {
+      if (!img) return;
+      const currentSrc = img.getAttribute('src') || '';
+      if (currentSrc.startsWith('http://') && !img.dataset.triedHttps) {
+        img.dataset.triedHttps = 'true';
+        img.src = currentSrc.replace(/^http:\/\//i, 'https://');
+        return;
+      }
+      img.onerror = null;
+      const label = encodeURIComponent(img.alt || 'Archivo Visual de Obra');
+      img.src = 'https://placehold.co/900x520/0f172a/fbbf24?text=' + label;
+    };
+  </script>
+  <style>
+    /* Fondo cósmico con fotografía panorámica de la Vía Láctea (ESO / S. Brunier) */
+    .board-bg-dark {
+      background-color: #020308;
+      background-image:
+        radial-gradient(ellipse at center, rgba(2, 3, 8, 0.32) 0%, rgba(2, 3, 8, 0.72) 100%),
+        linear-gradient(180deg, rgba(2, 3, 8, 0.45) 0%, rgba(2, 3, 8, 0.25) 45%, rgba(2, 3, 8, 0.65) 100%),
+        url('https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/ESO_-_Milky_Way.jpg/1920px-ESO_-_Milky_Way.jpg'),
+        url('https://upload.wikimedia.org/wikipedia/commons/6/60/ESO_-_Milky_Way.jpg'),
+        radial-gradient(circle at 50% 0%, rgba(15, 23, 42, 0.85) 0%, #020308 85%);
+      background-size: cover, cover, cover, cover, cover;
+      background-position: center center, center center, center center, center center, center center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+    }
+
+    /* Fondo cartográfico claro (Papel archivo) */
+    .board-bg-light {
+      background-color: #f4f2ec;
+      background-image:
+        radial-gradient(circle at 20% 10%, rgba(217, 119, 6, 0.06) 0%, transparent 45%),
+        radial-gradient(#cbd5e1 1px, transparent 1px);
+      background-size: 100% 100%, 22px 22px;
+    }
+
+    /* Barras de desplazamiento estilizadas */
+    .shelf-scroll::-webkit-scrollbar {
+      height: 10px;
+    }
+    .shelf-scroll::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.45);
+      border-radius: 999px;
+    }
+    .shelf-scroll::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.35);
+      border-radius: 999px;
+    }
+    .shelf-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(251, 191, 36, 0.55);
+    }
+
+    .col-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .col-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .col-scroll::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 999px;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    .line-clamp-6 {
+      display: -webkit-box;
+      -webkit-line-clamp: 6;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Estética de "Lo Oculto": Lente de Revelado / Cámara Oscura */
+    .darkroom-spotlight {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 25;
+      background: radial-gradient(
+        circle 260px at var(--mx, 50%) var(--my, 50%),
+        rgba(251, 191, 36, 0.08) 0%,
+        rgba(16, 185, 129, 0.04) 45%,
+        rgba(3, 7, 18, 0.72) 100%
+      );
+      transition: opacity 0.3s ease;
+    }
+
+    .hidden-veil {
+      filter: blur(4px);
+      opacity: 0.45;
+      user-select: none;
+      transition: filter 0.35s ease, opacity 0.35s ease;
+    }
+
+    .padlet-card:hover .hidden-veil,
+    .unveiled-mode .hidden-veil {
+      filter: blur(0px);
+      opacity: 1;
+      user-select: auto;
+    }
+  </style>
+</head>
+<body class="board-bg-dark text-slate-100 font-sans antialiased min-h-screen flex flex-col selection:bg-amber-400/30 selection:text-amber-200">
+
+  <!-- Capa óptica de Linterna Forense / Cámara Oscura -->
+  <div id="darkroomOverlay" class="darkroom-spotlight hidden"></div>
+
+  <!-- ==================== ENCABEZADO ESTILO PADLET ==================== -->
+  <header id="appHeader" class="sticky top-0 z-30 backdrop-blur-xl bg-slate-950/85 border-b border-slate-800/80 transition-colors">
+    <div class="max-w-[1920px] mx-auto px-3 sm:px-6 py-3 flex flex-col gap-3">
+      <!-- Fila Superior: Identidad y Botones Principales -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <!-- Logo y Título del Muro -->
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-emerald-600 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/20 shrink-0">
+            <i data-lucide="aperture" class="w-6 h-6 stroke-[2.2]"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-mono text-[10px] uppercase tracking-widest px-2.5 py-0.5 rounded-xl sm:rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 leading-snug">
+                El arte no puede cambiar el mundo pero puede dar entidad material a las metáforas, la reconstrucción del pasado y la imaginación del futuro.
+              </span>
+              <span id="totalCardsBadge" class="font-mono text-[11px] text-slate-400 shrink-0">
+                27 fichas activas
+              </span>
+            </div>
+            <h1 class="font-art italic text-xl sm:text-2xl md:text-[28px] font-bold tracking-wide text-amber-50 drop-shadow-[0_2px_10px_rgba(251,191,36,0.18)] leading-tight mt-0.5" id="boardTitle">
+              Sondear la oscuridad del presente. Lo que no vemos, lo que el arte ve
+            </h1>
+            <p class="font-art italic text-sm sm:text-base text-amber-200/80 tracking-wide">
+              Graciela Speranza (2022) · Cartografía crítica, constelación multimedia y laboratorio de lo invisible
+            </p>
+          </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <!-- Botón Especial: Lente de Revelado (Lo Oculto) -->
+          <button
+            id="btnUnveilMode"
+            onclick="toggleUnveilMode()"
+            title="Activar Lente Forense para revelar las capas ocultas de todas las fichas"
+            class="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/40 text-xs font-medium transition cursor-pointer"
+          >
+            <i data-lucide="scan-eye" class="w-4 h-4"></i>
+            <span class="hidden xl:inline" id="unveilLabel">Revelar lo oculto</span>
+          </button>
+
+          <!-- Botón Principal: Añadir Evidencia -->
+          <button
+            onclick="openCreateModal()"
+            class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 font-semibold text-xs sm:text-sm shadow-lg shadow-amber-500/20 transition cursor-pointer"
+          >
+            <i data-lucide="plus-circle" class="w-4 h-4 stroke-[2.4]"></i>
+            <span>+ Añadir evidencia / reflexión</span>
+          </button>
+
+          <!-- Selector de Vista: Estantería vs Muro -->
+          <div class="inline-flex rounded-xl bg-slate-900/90 p-1 border border-slate-800">
+            <button
+              id="btnViewShelf"
+              onclick="setViewMode('shelf')"
+              title="Vista Estantería (Columnas temáticas)"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-amber-300 transition cursor-pointer"
+            >
+              <i data-lucide="columns-3" class="w-3.5 h-3.5"></i>
+              <span class="hidden md:inline">Estantería</span>
+            </button>
+            <button
+              id="btnViewGrid"
+              onclick="setViewMode('grid')"
+              title="Vista Muro (Constelación completa)"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition cursor-pointer"
+            >
+              <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+              <span class="hidden md:inline">Muro</span>
+            </button>
+          </div>
+
+          <!-- Cambiar Tema de Fondo -->
+          <button
+            id="btnToggleTheme"
+            onclick="toggleTheme()"
+            title="Alternar fondo: Cosmos Profundo / Papel Cartográfico Claro"
+            class="p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 transition cursor-pointer"
+          >
+            <i data-lucide="sun" id="themeIcon" class="w-4 h-4"></i>
+          </button>
+
+          <!-- Exportar a Markdown -->
+          <button
+            onclick="exportMarkdown()"
+            title="Descargar archivo Markdown (.md) con toda la RAE y evidencias de clase"
+            class="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-medium transition cursor-pointer"
+          >
+            <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
+            <span class="hidden lg:inline">Exportar .MD</span>
+          </button>
+
+          <!-- Restaurar Tablero Base -->
+          <button
+            onclick="openResetModal()"
+            title="Restaurar fichas iniciales"
+            class="p-2.5 rounded-xl bg-slate-900/90 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 border border-slate-800 transition cursor-pointer"
+          >
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Fila Inferior: Buscador y Filtros Rápidos -->
+      <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
+        <!-- Buscador -->
+        <div class="relative w-full lg:w-80 shrink-0">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+          <input
+            type="text"
+            id="searchInput"
+            oninput="handleSearch(this.value)"
+            placeholder="Buscar obra, autor, concepto, Colombia..."
+            class="w-full pl-9 pr-8 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400/70 transition"
+          />
+          <button
+            id="clearSearchBtn"
+            onclick="clearSearch()"
+            class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+          >
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+
+        <!-- Filtros por Categoría -->
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+          <button onclick="setFilterTag('ALL')" data-tag="ALL" class="filter-pill active-pill px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-400 text-slate-950 whitespace-nowrap cursor-pointer transition">
+            Todas
+          </button>
+          <button onclick="setFilterTag('RAE')" data-tag="RAE" class="filter-pill px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800/90 text-slate-300 hover:bg-slate-700 border border-slate-700/70 whitespace-nowrap cursor-pointer transition">
+            Ficha y Resumen RAE
+          </button>
+          <button onclick="setFilterTag('COSMOS')" data-tag="COSMOS" class="filter-pill px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800/90 text-slate-300 hover:bg-slate-700 border border-slate-700/70 whitespace-nowrap cursor-pointer transition">
+            Hacer con el Cosmos
+          </button>
+          <button onclick="setFilterTag('FORENSE')" data-tag="FORENSE" class="filter-pill px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800/90 text-slate-300 hover:bg-slate-700 border border-slate-700/70 whitespace-nowrap cursor-pointer transition">
+            Reconstrucciones / Forense
+          </button>
+          <button onclick="setFilterTag('COLOMBIA')" data-tag="COLOMBIA" class="filter-pill px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800/90 text-slate-300 hover:bg-slate-700 border border-slate-700/70 whitespace-nowrap cursor-pointer transition">
+            Contexto Colombia
+          </button>
+          <button onclick="setFilterTag('ESTACION')" data-tag="ESTACION" class="filter-pill px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800/90 text-slate-300 hover:bg-slate-700 border border-slate-700/70 whitespace-nowrap cursor-pointer transition">
+            Multimedia (Videos/Fotos)
+          </button>
+          <button onclick="setFilterTag('CREACION')" data-tag="CREACION" class="filter-pill px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-950/80 text-emerald-300 hover:bg-emerald-900/80 border border-emerald-700/60 whitespace-nowrap cursor-pointer transition">
+            ✦ Creación Estudiantil
+          </button>
+          <button onclick="setFilterTag('REFLEXION')" data-tag="REFLEXION" class="filter-pill px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-950/80 text-amber-300 hover:bg-amber-900/80 border border-amber-700/60 whitespace-nowrap cursor-pointer transition">
+            ◈ Reflexión Plenaria
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra de salto rápido entre columnas (en vista Estantería) -->
+      <div id="columnQuickNav" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5 border-t border-slate-800/60 text-[11px]">
+        <span class="font-mono text-slate-500 uppercase mr-1 shrink-0">Ir a columna:</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== CONTENEDOR PRINCIPAL DEL TABLERO ==================== -->
+  <main id="boardContainer" class="flex-1 w-full max-w-[1920px] mx-auto px-3 sm:px-6 py-4 overflow-hidden flex flex-col">
+    <!-- Renderizado dinámico por JS -->
+  </main>
+
+  <!-- ==================== PIE DE PÁGINA: CRÉDITOS ACADÉMICOS ==================== -->
+  <footer id="appFooter" class="w-full max-w-[1920px] mx-auto px-3 sm:px-6 pb-3 pt-1 flex items-center justify-start z-20">
+    <div id="footerCard" class="inline-flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 px-4 py-2 rounded-2xl bg-slate-950/80 backdrop-blur-md border border-slate-800/90 shadow-lg text-xs text-slate-200 transition-colors">
+      <div class="flex items-center gap-2">
+        <i data-lucide="feather" class="w-3.5 h-3.5 text-amber-400 shrink-0"></i>
+        <span><span class="opacity-80">Autores:</span> <strong class="font-semibold">Felipe Roa y Estefanía Ortíz</strong></span>
+      </div>
+      <span class="hidden sm:inline opacity-40">|</span>
+      <div class="flex items-center gap-1.5 font-mono text-[11px] opacity-90">
+        <i data-lucide="graduation-cap" class="w-3.5 h-3.5 text-emerald-500 shrink-0"></i>
+        <span>Seminario Comunicación - Educación II · Universidad Distrital Francisco José de Caldas — Año 2026</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==================== MODAL 1: LECTURA AMPLIADA Y COMENTARIOS ==================== -->
+  <div id="detailModal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md">
+    <div class="bg-slate-900 border border-slate-700/90 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-slate-100">
+      <!-- Cabecera Modal -->
+      <div class="px-5 py-4 border-b border-slate-800 flex items-start justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span id="detailColumnBadge" class="font-mono text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30">
+              Columna
+            </span>
+            <span id="detailModalityBadge" class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+              Modalidad
+            </span>
+          </div>
+          <h2 id="detailTitle" class="font-art italic text-2xl sm:text-3xl font-bold text-amber-50 tracking-wide leading-snug">
+            Título de la Ficha
+          </h2>
+          <p id="detailAuthor" class="text-xs text-slate-400 flex items-center gap-2">
+            Autoría
+          </p>
+        </div>
+        <button onclick="closeDetailModal()" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer shrink-0">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Cuerpo Desplazable Modal -->
+      <div class="p-5 overflow-y-auto space-y-5 col-scroll flex-1">
+        <!-- Imagen adjunta o galería si existe -->
+        <div id="detailImageWrapper" class="hidden rounded-xl overflow-hidden border border-slate-700/80 bg-slate-950 relative group">
+          <div id="detailGalleryGrid" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-2 p-2 bg-slate-950"></div>
+          <img
+            id="detailImage"
+            src=""
+            alt="Evidencia visual"
+            onerror="handleImgFallback(this)"
+            class="w-full max-h-[420px] object-contain mx-auto"
+          />
+          <label id="detailReplaceImgLabel" class="absolute bottom-2.5 right-2.5 px-3 py-1.5 rounded-lg bg-slate-950/85 hover:bg-slate-900 text-amber-300 border border-amber-500/40 text-[11px] font-medium cursor-pointer inline-flex items-center gap-1.5 backdrop-blur-md transition">
+            <i data-lucide="image-plus" class="w-3.5 h-3.5"></i>
+            <span>Reemplazar imagen local</span>
+            <input type="file" accept="image/*" onchange="replaceCardImage(event)" class="hidden" />
+          </label>
+        </div>
+
+        <!-- Cita textual asociada a la imagen si existe -->
+        <blockquote id="detailQuoteWrapper" class="hidden p-4 rounded-xl bg-slate-950/80 border-l-4 border-amber-400 text-amber-100/95 font-art italic text-base sm:text-lg leading-relaxed"></blockquote>
+
+        <!-- Reproductores de Video embebidos (uno o varios, YouTube o MP4) si existen -->
+        <div id="detailVideoWrapper" class="hidden space-y-3"></div>
+
+        <!-- Enlace multimedia / obra externa si existe -->
+        <div id="detailLinkWrapper" class="hidden"></div>
+
+        <!-- Cita literaria en cursiva al cierre (si existe) -->
+        <div id="detailLiteraryExcerptWrapper" class="hidden p-4 rounded-xl bg-slate-950/85 border border-violet-500/35 space-y-2">
+          <div id="detailLiteraryExcerptLabel" class="font-mono text-[10px] uppercase tracking-wider text-violet-300"></div>
+          <blockquote id="detailLiteraryExcerptText" class="italic text-slate-200 text-xs sm:text-sm leading-relaxed whitespace-pre-line"></blockquote>
+        </div>
+
+        <!-- Capa Oculta Revelada en el Modal -->
+        <div id="detailHiddenLayerWrapper" class="hidden p-4 rounded-xl bg-amber-950/25 border border-amber-500/40 space-y-1.5">
+          <div class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-amber-300">
+            <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+            <span>Capa Oculta / Lo que el arte devela detrás de la superficie</span>
+          </div>
+          <p id="detailHiddenLayerText" class="text-xs sm:text-sm text-amber-100/95 leading-relaxed"></p>
+        </div>
+
+        <!-- Contenido académico completo -->
+        <div id="detailBody" class="text-slate-200 text-sm sm:text-base leading-relaxed space-y-3 whitespace-pre-line font-normal"></div>
+
+        <!-- Enlaces comentados de casos (si existen) -->
+        <div id="detailAnnotatedLinksWrapper" class="hidden space-y-3"></div>
+
+        <!-- Etiquetas -->
+        <div id="detailTags" class="flex flex-wrap gap-1.5 pt-2"></div>
+
+        <!-- Barra de Reacciones -->
+        <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+          <div class="flex items-center gap-3">
+            <button id="detailHeartBtn" onclick="toggleReactionFromModal('heart')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-slate-200 hover:text-rose-300 border border-slate-700 text-xs font-medium transition cursor-pointer">
+              <i data-lucide="heart" class="w-4 h-4 text-rose-400"></i>
+              <span id="detailHeartCount">0</span>
+              <span>Resonancia</span>
+            </button>
+            <button id="detailStarBtn" onclick="toggleReactionFromModal('star')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-amber-500/20 text-slate-200 hover:text-amber-300 border border-slate-700 text-xs font-medium transition cursor-pointer">
+              <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+              <span id="detailStarCount">0</span>
+              <span>Clave para debate</span>
+            </button>
+          </div>
+          <button id="detailDeleteBtn" onclick="deleteCurrentCard()" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/70 text-rose-300 border border-rose-800/60 text-xs font-medium transition cursor-pointer">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>Eliminar ficha</span>
+          </button>
+        </div>
+
+        <!-- Sección de Comentarios / Interpretación Colaborativa -->
+        <div class="pt-4 border-t border-slate-800 space-y-3">
+          <h3 class="text-xs font-mono uppercase tracking-wider text-amber-300 flex items-center gap-2">
+            <i data-lucide="message-square" class="w-4 h-4"></i>
+            <span>Anotaciones críticas y respuestas de los estudiantes (<span id="detailCommentCount">0</span>)</span>
+          </h3>
+
+          <div id="detailCommentsList" class="space-y-2.5 max-h-56 overflow-y-auto col-scroll pr-1"></div>
+
+          <!-- Formulario de nuevo comentario -->
+          <form onsubmit="submitComment(event)" class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                id="commentAuthorInput"
+                placeholder="Tu nombre o equipo (ej. Equipo 2 - Ana y Carlos)"
+                required
+                class="sm:w-1/3 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+              />
+              <input
+                type="text"
+                id="commentTextInput"
+                placeholder="Escribe tu interpretación sobre lo oculto, la escala o el contexto..."
+                required
+                class="flex-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+              />
+              <button type="submit" class="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold text-xs transition cursor-pointer shrink-0">
+                Publicar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 2: CREAR NUEVA TARJETA / EVIDENCIA ==================== -->
+  <div id="createModal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden text-slate-100">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <span class="font-mono text-[10px] uppercase tracking-widest text-emerald-400">Momento 2 y 3 · Creación y Reflexión</span>
+          <h2 class="font-art italic text-xl sm:text-2xl font-bold text-amber-50 tracking-wide">Publicar Evidencia o Reflexión en el Muro</h2>
+        </div>
+        <button onclick="closeCreateModal()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handleCreateCard(event)" class="p-5 overflow-y-auto space-y-4 col-scroll">
+        <!-- Fila 1: Columna destino y Modalidad -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Columna del tablero</label>
+            <select id="inputColumn" required class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Modalidad narrativa / analítica</label>
+            <select id="inputModality" required class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400">
+              <option value="Modalidad A: Voz en cuarta persona (Tokarczuk)">Modalidad A: Voz en cuarta persona (Tokarczuk)</option>
+              <option value="Modalidad B: Pie de foto contraforense (Gerber / FA)">Modalidad B: Pie de foto contraforense (Gerber / FA)</option>
+              <option value="Reflexión Final: Constelación y Aula">Reflexión Final: Constelación y Aula</option>
+              <option value="Análisis de Estación Multimedia">Análisis de Estación Multimedia</option>
+              <option value="Síntesis / Debate RAE">Síntesis / Debate RAE</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fila 2: Título y Autor(es) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Título de la evidencia o reflexión *</label>
+            <input type="text" id="inputTitle" required placeholder="Ej. Crónica de una bolsa atrapada en un árbol" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Estudiante(s) / Equipo *</label>
+            <input type="text" id="inputAuthor" required placeholder="Ej. Equipo 3 — María y Julián" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400" />
+          </div>
+        </div>
+
+        <!-- Fila 3: Texto principal con contador de palabras -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-xs font-medium text-slate-300">Texto (máx. 120 palabras sugeridas para taller) *</label>
+            <span id="wordCounter" class="font-mono text-[11px] text-emerald-400">0 / 120 palabras</span>
+          </div>
+          <textarea
+            id="inputBody"
+            rows="4"
+            required
+            oninput="updateWordCounter(this.value)"
+            placeholder="Redacta aquí tu crónica desde la perspectiva del objeto (4ª persona), el análisis contraforense o tu reflexión sobre cómo el arte revela lo invisible..."
+            class="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 leading-relaxed"
+          ></textarea>
+        </div>
+
+        <!-- Capa Oculta / Subtexto invisible opcional -->
+        <div>
+          <label class="block text-xs font-medium text-amber-300 mb-1 flex items-center gap-1.5">
+            <i data-lucide="eye-off" class="w-3.5 h-3.5"></i>
+            <span>Capa Oculta / Dato invisible tras la apariencia (se revela al pasar el cursor)</span>
+          </label>
+          <input
+            type="text"
+            id="inputHiddenLayer"
+            placeholder="Ej. Este envase tardará 450 años en fragmentarse en microplásticos invisibles..."
+            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-amber-500/30 text-xs text-amber-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+          />
+        </div>
+
+        <!-- Carga Multimedia: Foto desde celular o URL -->
+        <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-amber-300 flex items-center gap-1.5">
+              <i data-lucide="camera" class="w-4 h-4"></i>
+              <span>Adjuntar fotografía (desde celular/PC) o enlace multimedia</span>
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">Subir foto desde dispositivo</label>
+              <input
+                type="file"
+                id="inputImageFile"
+                accept="image/*"
+                onchange="handleImageUpload(event)"
+                class="w-full text-xs text-slate-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-amber-300 hover:file:bg-slate-700 cursor-pointer"
+              />
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">O pegar URL de imagen</label>
+              <input
+                type="url"
+                id="inputImageUrl"
+                placeholder="https://..."
+                class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Enlace externo opcional (YouTube, Google Maps, Audio, Artículo)</label>
+            <input
+              type="url"
+              id="inputMediaLink"
+              placeholder="https://www.youtube.com/watch?v=..."
+              class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+            />
+          </div>
+
+          <!-- Previsualización de imagen subida -->
+          <div id="uploadPreviewBox" class="hidden relative rounded-lg overflow-hidden border border-slate-700 max-h-40">
+            <img id="uploadPreviewImg" src="" alt="Vista previa" class="w-full h-36 object-cover" />
+            <button type="button" onclick="clearUploadedImage()" class="absolute top-2 right-2 px-2 py-1 rounded bg-slate-950/80 text-rose-300 text-[11px] cursor-pointer">
+              Quitar foto
+            </button>
+          </div>
+        </div>
+
+        <!-- Selector de Color de Tarjeta -->
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1.5">Color de acento de la tarjeta</label>
+          <div class="flex items-center gap-2.5">
+            <button type="button" onclick="selectCardColor('amber')" data-color="amber" class="color-dot w-7 h-7 rounded-full bg-amber-500 ring-2 ring-white cursor-pointer"></button>
+            <button type="button" onclick="selectCardColor('emerald')" data-color="emerald" class="color-dot w-7 h-7 rounded-full bg-emerald-500 opacity-70 hover:opacity-100 cursor-pointer"></button>
+            <button type="button" onclick="selectCardColor('sky')" data-color="sky" class="color-dot w-7 h-7 rounded-full bg-sky-500 opacity-70 hover:opacity-100 cursor-pointer"></button>
+            <button type="button" onclick="selectCardColor('rose')" data-color="rose" class="color-dot w-7 h-7 rounded-full bg-rose-500 opacity-70 hover:opacity-100 cursor-pointer"></button>
+            <button type="button" onclick="selectCardColor('violet')" data-color="violet" class="color-dot w-7 h-7 rounded-full bg-violet-500 opacity-70 hover:opacity-100 cursor-pointer"></button>
+            <button type="button" onclick="selectCardColor('stone')" data-color="stone" class="color-dot w-7 h-7 rounded-full bg-stone-500 opacity-70 hover:opacity-100 cursor-pointer"></button>
+          </div>
+          <input type="hidden" id="inputCardColor" value="amber" />
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+          <button type="button" onclick="closeCreateModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium cursor-pointer">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold text-xs sm:text-sm shadow-lg shadow-amber-500/20 cursor-pointer">
+            Publicar en el Padlet
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 3: CONFIRMACIÓN DE REINICIO ==================== -->
+  <div id="resetModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl text-slate-100">
+      <div class="flex items-center gap-3 text-rose-400">
+        <div class="p-2.5 rounded-xl bg-rose-500/15">
+          <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        </div>
+        <h3 class="font-art italic text-xl font-bold text-white">Restaurar tablero base</h3>
+      </div>
+      <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+        Esta acción restaurará las 27 tarjetas iniciales de la Reseña Crítica Académica y eliminará las tarjetas o comentarios agregados localmente en este navegador.
+      </p>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeResetModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium cursor-pointer">
+          Cancelar
+        </button>
+        <button onclick="confirmResetBoard()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold cursor-pointer">
+          Sí, restaurar tablero
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== NOTIFICACIÓN FLOTANTE (TOAST) ==================== -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ==================== LÓGICA DE APLICACIÓN Y DATOS ==================== -->
+  <script>
+    const STORAGE_KEY = 'padlet_speranza_antropoceno_v36';
+
+    const COLUMNS = [
+      {
+        id: 'col-1',
+        title: '1. Ficha Técnica y Tesis Central',
+        subtitle: 'Identificación RAE, resumen analítico e introducción',
+        accent: 'border-amber-400/60',
+        dot: 'bg-amber-400'
+      },
+      {
+        id: 'col-2',
+        title: 'Cap. I Lo que no vemos. Hacer con el cosmos',
+        subtitle: 'Escalas cósmicas, tiempo sideral y escucha multiespecie',
+        accent: 'border-sky-400/60',
+        dot: 'bg-sky-400'
+      },
+      {
+        id: 'col-3',
+        title: '3. Cap. II Reconstrucciones y Contraforensia',
+        subtitle: 'Arquitectura forense, reparación y narrar en cuarta persona',
+        accent: 'border-violet-400/60',
+        dot: 'bg-violet-400'
+      },
+      {
+        id: 'col-4',
+        title: '4. Contexto Colombia: Arte y Memoria',
+        subtitle: 'Contra-monumentos, ríos testigos y escuelas silenciadas',
+        accent: 'border-emerald-400/60',
+        dot: 'bg-emerald-400'
+      },
+      {
+        id: 'col-5',
+        title: '5. Balance Crítico (Aportes y Límites)',
+        subtitle: 'Potencia epistémica, tensiones materiales y preguntas abiertas',
+        accent: 'border-rose-400/60',
+        dot: 'bg-rose-400'
+      },
+      {
+        id: 'col-6',
+        title: '6. Preguntas Detonadoras (Debate)',
+        subtitle: 'Interrogantes para el seminario de Educación y Comunicación',
+        accent: 'border-orange-400/60',
+        dot: 'bg-orange-400'
+      },
+      {
+        id: 'col-7',
+        title: '7. Estaciones Multimedia (Clase)',
+        subtitle: 'Archivo audiovisual, recorridos virtuales y dispositivos sonoros',
+        accent: 'border-cyan-400/60',
+        dot: 'bg-cyan-400'
+      },
+      {
+        id: 'col-8',
+        title: '8. Laboratorio y Plenaria (Estudiantes)',
+        subtitle: 'Crónicas en 4ª persona, pies de foto forenses y síntesis colectiva',
+        accent: 'border-lime-400/60',
+        dot: 'bg-lime-400'
+      }
+    ];
+
+    const INITIAL_CARDS = [
+      // ==================== COLUMNA 1: FICHA TÉCNICA Y TESIS CENTRAL ====================
+      {
+        id: 'card-1-1',
+        columnId: 'col-1',
+        title: 'Identificación Bibliográfica y Obra',
+        author: 'Graciela Speranza · Editorial Anagrama (2022)',
+        modality: 'Ficha Técnica RAE',
+        color: 'amber',
+        tags: ['RAE'],
+        imageUrl: 'https://cms.anagrama-ed.es/uploads/media/autores/0001/26/thumb_25496_autores_big.jpeg',
+        hiddenLayer: 'Ensayo híbrido que articula crítica de arte, literatura comparada, ecocrítica y filosofía de la ciencia frente a la ceguera perceptiva del Antropoceno.',
+        body: 'Referencia completa: Speranza, Graciela (2022). Lo que no vemos, lo que el arte ve. Barcelona: Editorial Anagrama (Colección Argumentos, 240 pp.).\n\nTesis central: Ante la crisis ecológica, la violencia extractivista y las escalas temporales y espaciales del Antropoceno —que desbordan la percepción sensorial humana habitual—, el arte contemporáneo funciona como un dispositivo óptico, acústico y narrativo capaz de volver sensible lo invisible, descentralizar la mirada antropocéntrica e imaginar formas de reparación ética.',
+        hearts: 18,
+        stars: 12,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-1-2',
+        columnId: 'col-1',
+        title: 'Resumen Analítico e Hipótesis Central',
+        author: 'Eduardo Basualdo · El pacto (referencia de apertura)',
+        modality: 'Resumen Analítico RAE',
+        color: 'amber',
+        tags: ['RAE'],
+        imageUrl: 'https://www.malba.org.ar/wp-content/uploads/2014/09/basualdo_01.jpg',
+        imageQuote: '«Mirar en la oscuridad no significa resignarse a la ceguera, sino entrenar la pupila para distinguir los contornos de aquello que el hábito y la velocidad del presente vuelven invisible.»',
+        hiddenLayer: 'La estructura del libro opera por constelaciones benjaminianas: cada obra dialoga con textos literarios y científicos para desmontar la ilusión de transparencia.',
+        body: 'Graciela Speranza propone una travesía por el arte y la literatura contemporáneos organizada en dos grandes movimientos: mirar hacia afuera y hacia atrás (las escalas cósmicas, geológicas y multiespecie) y mirar hacia adentro de las ruinas del presente (las técnicas contraforenses, la reconstrucción de la memoria y la narración en cuarta persona).\n\nFrente al ruido informativo y la saturación visual de las pantallas, las obras reunidas desaceleran la mirada para revelar las huellas materiales del capital, el trauma histórico y las interdependencias entre humanos y no humanos.',
+        hearts: 14,
+        stars: 9,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-1-3',
+        columnId: 'col-1',
+        title: 'Introducción: Sondear la oscuridad del presente',
+        author: 'Francisco de Goya · Perro semihundido (1819–1823)',
+        modality: 'Marco Conceptual RAE',
+        color: 'stone',
+        tags: ['RAE', 'ESTACION'],
+        imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Goya_-_Perro_semihundido.jpg/800px-Goya_-_Perro_semihundido.jpg',
+        videoUrls: ['https://www.youtube.com/watch?v=9x5r2l9lJ7E'],
+        hiddenLayer: 'Pintada directamente sobre el muro de la Quinta del Sordo, la pintura negra de Goya prefigura la incertidumbre contemporánea: un animal minúsculo frente a un vacío atmosférico insondable.',
+        body: 'Speranza abre su ensayo invocando el célebre «Perro semihundido» de Francisco de Goya y la noción de Giorgio Agamben sobre lo contemporáneo: ser contemporáneo es mantener la mirada fija en la oscuridad de la propia época para percibir esa luz que intenta alcanzarnos sin lograrlo.\n\nEn un mundo atravesado por el cambio climático, la extinción masiva y las violencias invisibilizadas, el arte no ofrece respuestas cerradas ni consuelos fáciles, sino instrumentos de sondeo en la penumbra del presente.',
+        hearts: 16,
+        stars: 11,
+        comments: [],
+        isCustom: false
+      },
+
+      // ==================== COLUMNA 2: CAP. I LO QUE NO VEMOS. HACER CON EL COSMOS ====================
+      {
+        id: 'card-2-1',
+        columnId: 'col-2',
+        title: 'Alicja Kwade. ParaPivot',
+        author: 'Alicja Kwade · Roof Garden Commission, The Met (2019)',
+        modality: 'Hacer con el Cosmos',
+        color: 'sky',
+        tags: ['COSMOS', 'ESTACION'],
+        imageUrl: 'https://alicjakwade.com/media/pages/exhibitions/parapivot/b7fd62f4dd-1606326193/b0018846-2000x.jpg',
+        videoUrls: ['https://alicjakwade.com/media/pages/exhibitions/parapivot/9ca237f799-1706188174/timelapse_roof2.mp4'],
+        hiddenLayer: 'Las esferas provienen de piedras extraídas de distintos continentes (granito, mármol, cuarcita), condensando millones de años de tiempo geológico suspendidos sobre la arquitectura financiera de Nueva York.',
+        body: 'Kwade instala en ParaPivot un planetario tridimensional de esferas de mármol que flotan sobre el skyline de Manhattan, enfrentando la escala cósmica a la hybris del capital financiero encarnada en los rascacielos superdelgados.',
+        hearts: 19,
+        stars: 14,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-2-2',
+        columnId: 'col-2',
+        title: 'Tiempo Sideral y Cápsulas Vivas (Agnes Denes y Faivovich & Goldberg)',
+        author: 'Agnes Denes · Wheatfield. A Confrontation (1982) & Tree Mountain (1992–1996)',
+        modality: 'Hacer con el Cosmos',
+        color: 'amber',
+        tags: ['COSMOS', 'ESTACION'],
+        galleryImages: [
+          'http://www.agnesdenesstudio.com/img/works7/Wheat5.jpg',
+          'http://www.agnesdenesstudio.com/img/works7/Wheat6.jpg',
+          'http://www.agnesdenesstudio.com/img/works7/Wheat7.jpg'
+        ],
+        videoUrls: ['https://www.youtube.com/watch?v=7hfQjkuM3t8'],
+        hiddenLayer: 'El terreno de Battery Park Landfill donde se sembró el trigo estaba valuado en 4.500 millones de dólares: la cosecha produjo más de 450 kilos de grano que viajaron por 28 ciudades del mundo.',
+        body: 'Denes opone en Wheatfield. A Confrontation una hectárea de trigo frente a las Torres Gemelas de Wall Street y concibe en Tree Mountain un bosque de 11.000 abetos protegidos durante 400 años en Finlandia, erigiendo una cápsula del tiempo que desafía la temporalidad corta del mercado.',
+        hearts: 17,
+        stars: 13,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-2-3',
+        columnId: 'col-2',
+        title: 'Faivovich & Goldberg. Encuentro con El Mataco',
+        author: 'Guillermo Faivovich & Nicolás Goldberg · Campo del Cielo',
+        modality: 'Hacer con el Cosmos',
+        color: 'sky',
+        tags: ['COSMOS', 'ESTACION'],
+        galleryImages: [
+          'https://freight.cargo.site/w/1000/i/F1771927870219883727837689320124/mataco_edu.jpg',
+          'https://freight.cargo.site/w/1000/i/J1771919807129602365318968414908/Plano-Mataco.jpg'
+        ],
+        hiddenLayer: 'El Mataco es un fragmento meteorítico caído hace unos 4.000 años en Campo del Cielo (Chaco, Argentina), cuya historia combina cosmovisiones indígenas, saqueos científicos y disputas patrimoniales.',
+        body: 'Emplazado en el centro de una sala negra, apenas iluminada por una tenue luz cenital que lo alumbra, y sumergido en una cavidad octogonal que invita a sentarse en los bordes para contemplarlo al mismo tiempo que evoca el antiguo templete, El Mataco parece flotar en la noche oscura del cosmos. La espesura del dispositivo diseñado para exhibirlo lo vuelve, antes que nada, una imagen. Pero la suya no es una imagen espacial o racional, sino algo más parecido a lo que Henri Bergson llamaría una “imagen-materia”, aquella imagen pura que luego se convertirá en un recuerdo. El encuentro con esta presencia arcaica, suspendida en la negrura espesa de la sala, engendra una corazonada extraña: si ya hubo un mundo sin nosotros, bien puede haber otro.',
+        hearts: 15,
+        stars: 11,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-2-4',
+        columnId: 'col-2',
+        title: 'Eduardo Navarro. Sound Mirror (2016)',
+        author: 'Eduardo Navarro · 32.ª Bienal de São Paulo (Incerteza Viva)',
+        modality: 'Hacer con el Cosmos',
+        color: 'emerald',
+        tags: ['COSMOS', 'ESTACION'],
+        imageUrl: 'https://www.navarroeduardo.art/wp-content/uploads/2021/07/MG_0350_hi-1-scaled.jpg',
+        hiddenLayer: 'El conducto acústico de cobre y latón atraviesa la arquitectura modernista de Oscar Niemeyer para habilitar una escucha lenta y simétrica con la fisiología vegetal.',
+        body: 'Sound Mirror (2016), presentada en la 32.ª Bienal, es una especie de instrumento construido para conectar acústicamente una palmera, ubicada fuera del Pabellón de la Bienal, con el espacio de la exposición. La planta y los visitantes se sitúan en posiciones equivalentes, en un intercambio sonoro que desafía los significados de la comunicación y la escucha. La obra de Navarro apunta a una tecnología emocional capaz de hacernos reflexionar sobre las conexiones que el arte desencadena a través de la relación permeable entre los seres vivos, el artista y el público, los actores y los objetos de arte.',
+        hearts: 13,
+        stars: 9,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-2-5',
+        columnId: 'col-2',
+        title: 'Escucha Multiespecie, Digestión y Mundos No Humanos',
+        author: 'Tomás Saraceno · Rugilė Barzdžiukaitė, Vaiva Grainytė & Lina Lapelytė (Sun & Sea)',
+        modality: 'Hacer con el Cosmos',
+        color: 'sky',
+        tags: ['COSMOS', 'ESTACION'],
+        mediaLink: 'https://studiotomassaraceno.org/arachnid-orchestra-jam-sessions/',
+        mediaLabel: 'Explorar página interactiva: Arachnid Orchestra Jam Sessions (Tomás Saraceno)',
+        videoUrls: [
+          'https://www.youtube.com/watch?v=eWre6dlUAbo',
+          'https://www.youtube.com/watch?v=_hp9ocXmBIk&list=RD_hp9ocXmBIk&start_radio=1'
+        ],
+        hiddenLayer: 'Mientras las arañas perciben el mundo mediante vibraciones de seda imperceptibles al oído humano, la ópera-performance Sun & Sea (León de Oro en Venecia 2019) convierte la arena de playa en un reloj de arena climático.',
+        body: 'Una playa observada desde arriba, habitada por cuerpos tan frágiles como el planeta Tierra. Así describe Rugilė Barzdžiukaitė a Sun & Sea: una playa que canta, donde ocurren múltiples historias al mismo tiempo, un espejo social que funciona como un zoológico antropológico. Durante una hora, Sun & Sea nos invita a tomar distancia de la condición humana y a mirarnos desde afuera: nuestros deseos, nuestros problemas, nuestras rutinas. Es una experiencia que nos confronta con las dinámicas de la vida contemporánea y con la paradoja de un cuerpo agotado que sueña con descanso en una playa paradisiaca, mientras la catástrofe sucede.',
+        hearts: 21,
+        stars: 15,
+        comments: [],
+        isCustom: false
+      },
+
+      // ==================== COLUMNA 3: CAP. II RECONSTRUCCIONES Y CONTRAFORENSIA ====================
+      {
+        id: 'card-3-1',
+        columnId: 'col-3',
+        title: 'Estética y Arquitectura Forense',
+        author: 'Forensic Architecture · Eyal Weizman & Paulo Tavares (Goldsmiths)',
+        modality: 'Reconstrucciones y Contraforensia',
+        color: 'violet',
+        tags: ['FORENSE'],
+        hiddenLayer: 'La contra-forensia invierte la mirada panóptica del Estado y las corporaciones: convierte píxeles, sombras, frecuencias acústicas y rastros arquitectónicos en prueba jurídica y memoria pública.',
+        body: 'Forensic Architecture (FA) es una agencia de investigación interdisciplinaria con sede en Goldsmiths, Universidad de Londres, fundada en 2010 por el arquitecto Eyal Weizman.\n¿Qué hacen?\n- Investigación de violaciones de derechos humanos: Analizan y documentan casos de violencia estatal, abusos corporativos, crímenes de guerra y destrucción ambiental.\n- Contra-forensia: Emplean herramientas tecnológicas que suelen usar los Estados (como imágenes satelitales, circuitos cerrados de televisión, geolocalización y modelado tridimensional) para escrutar y cuestionar las versiones oficiales de los gobiernos.\n- Reconstrucción espacial: Utilizan planos, videos, testimonios y rastros materiales para recrear en 3D los espacios y momentos exactos en los que ocurrieron hechos violentos. Sus modelos digitales ayudan a las víctimas a recuperar la memoria del trauma y sirven como evidencia en tribunales, comisiones de la verdad y cortes internacionales.',
+        annotatedLinks: [
+          {
+            title: '1) Caso de "Minería del Oro y Violencia en la Selva Amazónica"',
+            url: 'https://forensic-architecture.org/investigation/gold-mining-and-violence-in-the-amazon-rainforest',
+            description: 'Tavares deconstruye la «miopía epistemológica» de la cartografía oficial sobre la Amazonia, revelando con imágenes satelitales y arqueología forense que la selva no es una masa virgen sino una “polis expandida” y un archivo vivo de ruinas arquitectónicas indígenas destruidas por el ecocidio colonial y la dictadura militar.'
+          },
+          {
+            title: '2) Triple Perseguidor',
+            url: 'https://forensic-architecture.org/investigation/triple-chaser',
+            description: 'En «Triple-Chaser» (2019), entrenaron algoritmos de visión por computadora con imágenes sintéticas fotorrealistas para rastrear granadas lacrimógenas fabricadas por Safariland —cuyo vicepresidente integraba la junta del Museo Whitney— usadas contra migrantes y manifestantes en el mundo.'
+          }
+        ],
+        hearts: 20,
+        stars: 16,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-3-2',
+        columnId: 'col-3',
+        title: 'Reparar: Una mirada desde el arte contemporáneo | Kader Attia',
+        author: 'Kader Attia · Ética de la reparación y Un descenso al Paraíso',
+        modality: 'Reconstrucciones y Contraforensia',
+        color: 'violet',
+        tags: ['FORENSE', 'ESTACION'],
+        videoUrls: ['https://www.youtube.com/watch?v=FVAFV3Iards&t=12s'],
+        hiddenLayer: 'A diferencia de la restauración occidental que borra la cicatriz para fingir una integridad intacta, la reparación en Attia exhibe la sutura como memoria viva de la herida histórica y colonial.',
+        body: 'Kader Attia ha insistido en que la reparación no es solo un gesto material, sino una práctica ética: reapropiarse de los espacios y tiempos intersticiales que aún resisten dentro de entornos profundamente dañados. Cuidarlos —dice— exige reinventar herramientas colectivas, pues las que heredamos ya no responden a las crisis actuales. En ese terreno, el arte opera como un laboratorio donde es posible ensayar nuevas formas de individuación compartida y desplazar la mirada desde la estética superficial que promueve el capitalismo hacia una ética de la profundidad, indispensable para la convivencia.\nEsa advertencia resuena con especial fuerza en Un descenso al Paraíso, una exposición que invierte la lógica ascensional de la modernidad —su fe en el progreso, la elevación y la promesa de redención— para situarnos en un movimiento contrario: un descenso que no implica caída, sino una búsqueda lúcida en las zonas donde se fraguan las discontinuidades, las heridas y los posibles modos de transformarlas.',
+        hearts: 16,
+        stars: 12,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-3-3',
+        columnId: 'col-3',
+        title: 'Narrar en Cuarta Persona',
+        author: 'Olga Tokarczuk · Discurso Nobel (2018) & El origen de las especies',
+        modality: 'Reconstrucciones y Contraforensia',
+        color: 'violet',
+        tags: ['FORENSE', 'RAE'],
+        imageUrl: 'https://cms.anagrama-ed.es/uploads/media/autores/0001/29/thumb_28629_autores_big.jpeg',
+        mediaLink: 'https://www.nobelprize.org/prizes/literature/2018/tokarczuk/lecture/',
+        mediaLabel: 'Fuente bibliográfica: Discurso del Premio Nobel de Literatura — Olga Tokarczuk (2018)',
+        literaryExcerptLabel: 'Cita textual de «El origen de las especies» (Olga Tokarczuk):',
+        literaryExcerpt: '«Asistimos a la aparición en la Tierra de nuevos seres que ya han conquistado todos los continentes y la mayoría de los nichos ecológicos. Son gregarios y anemófilos, superan sin dificultad grandes distancias. Los veo por la ventanilla del autobús, anémonas aerotransportadas, rebaños enteros, cual nómadas por el desierto. Individuos solitarios que se agitan ruidosamente aferrados a las escasas y esmirriadas plantas desérticas: a lo mejor es su modo de comunicarse. Los especialistas sostienen que las bolsas de plástico constituyen un nuevo capítulo de la existencia, que trastocan los sempiternos hábitos de la naturaleza, pues se componen únicamente de superficie, por dentro están vacías, y que esa renuncia histórica a contener les reporta pingües beneficios evolutivos. Son rápidas y livianas; sus prensiles orejas les permiten agarrarse a objetos u órganos de otros seres ampliando así su espacio vital. Empezaron por los suburbios de las grandes ciudades y los vertederos de basura y han tardado un par de estaciones ventosas en llegar a provincias y descampados remotos. Se han apoderado de vastas extensiones de la Tierra: desde grandes cruces de autopistas hasta tortuosas playas, desde el espacio de delante de un centro comercial que acaba de cerrar hasta las óseas laderas del Himalaya. A primera vista parecen frágiles, débiles, pero no es más que una ilusión: son longevas, casi indestructibles; sus etéreos cuerpos tardarán unos trescientos años en descomponerse.\nNunca hemos tenido que enfrentarnos a una forma de existencia tan agresiva. Hay quienes opinan, en un arrebato metafísico, que en su naturaleza anida la vocación de hacerse con el mundo, de conquista de los continentes; como mera forma de búsqueda de un contenido del que, sin embargo, se aburre enseguida para volver a entregarse al viento. Que es un ojo errante perteneciente a un «allí» irreal, un observador misterioso que participa de ese panóptico. Otros, los que tienen los pies en la tierra, sostienen que hoy la evolución promueve formas etéreas capaces de poblar el mundo durante un breve lapso de tiempo, a cambio obtienen la omnipresencia.»',
+        body: '(...) sueño con un nuevo tipo de narrador: uno en cuarta persona, que no sea simplemente una construcción gramatical, sino que logre abarcar la perspectiva de cada personaje, además de tener la capacidad de trascender su horizonte, que vea más allá y tenga una visión más amplia, y que sea capaz de ignorar el tiempo. Oh sí, creo que la existencia de este narrador es posible.\n¿Te has preguntado alguna vez quién es el maravilloso narrador de la Biblia que clama en voz alta: «En el principio era el Verbo»? ¿Quién es el narrador que describe la creación del mundo, su primer día, cuando el caos se separó del orden, que sigue la secuencia sobre el origen del universo, que conoce los pensamientos de Dios, es consciente de sus dudas y, con mano firme, plasma en papel la increíble frase: «Y vio Dios que era bueno»? ¿Quién es este que sabe lo que Dios pensó?\nDejando de lado toda duda teológica, podemos considerar esta figura de un narrador misterioso y tierno como milagrosa y significativa. Se trata de un punto de vista, una perspectiva desde la que todo puede verse. Ver todo implica reconocer el hecho fundamental de que todas las cosas que existen están interconectadas en un todo único, aunque aún desconozcamos las conexiones entre ellas. Ver todo también implica una responsabilidad completamente diferente hacia el mundo, porque se hace evidente que cada gesto «aquí» está conectado a un gesto «allí», que una decisión tomada en una parte del mundo tendrá repercusiones en otra, y que diferenciar entre «mío» y «tuyo» empieza a ser cuestionable.',
+        hearts: 23,
+        stars: 17,
+        comments: [],
+        isCustom: false
+      },
+
+      // ==================== COLUMNA 4: CONTEXTO COLOMBIA: ARTE Y MEMORIA ====================
+      {
+        id: 'card-4-1',
+        columnId: 'col-4',
+        title: 'Doris Salcedo: Contra-monumento y Duelo Material',
+        author: 'Doris Salcedo · Fragmentos, Espacio de Arte y Memoria (Bogotá, 2018)',
+        modality: 'Diálogo Contexto Colombia',
+        color: 'emerald',
+        tags: ['COLOMBIA', 'FORENSE', 'ESTACION'],
+        videoUrls: ['https://www.youtube.com/watch?v=ZKwFSW45tbk'],
+        hiddenLayer: '37 toneladas de fusiles entregados por las FARC-EP fueron fundidas y martilladas a mano por mujeres víctimas de violencia sexual durante el conflicto armado para formar las 1.296 láminas del piso.',
+        body: 'El contra-monumento \'Fragmentos\', concebido por la artista Doris Salcedo y realizado con la colaboración de mujeres víctimas del conflicto armado colombiano, es operado por el Museo Nacional de Colombia del Ministerio de Cultura y tiene una programación que reúne la presentación de obras artísticas comisionadas especialmente para el sitio, actividades culturales, conferencias y talleres.\n\nLa obra consta de tres espacios articulados en una gran superficie de metal conformada por el metal fundido de las armas entregadas por la ex guerrilla de las FARC.\nEn diálogo directo con las poéticas de la reparación y la contraforensia analizadas por Speranza, «Fragmentos» (Bogotá) transforma el metal bélico en un espacio habitable de memoria crítica donde las víctimas inscriben sus relatos.',
+        hearts: 22,
+        stars: 16,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-4-2',
+        columnId: 'col-4',
+        title: 'Clemencia Echeverri: Río Cauca y Escucha del Territorio Herido',
+        author: 'Clemencia Echeverri · Treno (Canto fúnebre, 2007)',
+        modality: 'Diálogo Contexto Colombia',
+        color: 'emerald',
+        tags: ['COLOMBIA', 'COSMOS'],
+        mediaLink: 'https://www.clemenciaecheverri.com/treno-desaparicion-forzada-en-rios/',
+        mediaLabel: 'Documentación de obra: Treno — Desaparición forzada en ríos (Clemencia Echeverri)',
+        hiddenLayer: 'El río Cauca ha sido utilizado históricamente como fosa común invisible del conflicto armado colombiano; la instalación enfrenta dos pantallas para situar el cuerpo del espectador en medio de la corriente.',
+        body: 'Canto fúnebre de 14 minutos de duración, es una video instalación sonido de dos o mas proyecciones enfrentadas. Construye un diálogo entre dos orillas del Río Cauca en Colombia, sumergiendo al espectador entre el crecimiento del agua y los gritos a través de llamados sin respuesta. Asistimos a una trenodia: un canto fúnebre por una catástrofe de orden político. Se trata de un lamento por las víctimas. En este caso el lamento es tanto visual como sonoro, el espacio intermedio entre las dos pantallas se va llenando de imagen y sonido, de silencios y sombras. El sonido Dolby 5.1 actúa como plataforma de un territorio por donde transita el flujo del agua y la voz evocando pérdida y violencia. La obra audiovisual y sonora de Clemencia Echeverri convierte los ríos colombianos en testigos materiales de la violencia y del extractivismo hidroeléctrico, resonando con la noción de «testigo material» de Susan Schuppli.',
+        hearts: 18,
+        stars: 14,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-4-3',
+        columnId: 'col-4',
+        title: 'Los silencios de Juan Manuel Echavarría, una simbólica de la ausencia',
+        author: 'Juan Manuel Echavarría & Fernando Grisález · Silencios (2010–presente)',
+        modality: 'Diálogo Contexto Colombia',
+        color: 'amber',
+        tags: ['COLOMBIA', 'FORENSE', 'ESTACION'],
+        imageUrl: 'https://jmechavarria.com/wp-content/uploads/2023/08/EscuelaMampujan_SilencioLobonitoesestarvivo-2.jpg',
+        videoUrls: ['https://www.youtube.com/watch?v=LrK2tClI9hs'],
+        hiddenLayer: 'Los tableros escolares vacíos y cubiertos por la selva conservan las últimas lecciones escritas antes del desplazamiento forzado, convirtiendo el aula abandonada en un testigo material de la guerra.',
+        body: 'Desde el año 2010, el artista Juan Manuel Echavarría y el videasta Fernando Grisález recorren el territorio colombiano en sus recónditos más alejados tras el rastro de escuelas primarias abandonadas por motivo del conflicto y de los desplazamientos que ocasiona. Esta investigación responde a un triple proyecto: 1) darle visibilidad nacional a los estragos del conflicto; 2) educar contra la guerra; 3) elaborar un lenguaje estético que sea capaz de informar y conmover a la vez, pero sin abrumar al espectador.',
+        hearts: 17,
+        stars: 13,
+        comments: [],
+        isCustom: false
+      },
+
+      // ==================== COLUMNA 5: BALANCE CRÍTICO (APORTES Y LÍMITES) ====================
+      {
+        id: 'card-5-1',
+        columnId: 'col-5',
+        title: 'Aporte 1: Descentralización Perceptiva y Alfabetización de lo Invisible',
+        author: 'Valoración Crítica RAE · Potencia Epistémica',
+        modality: 'Balance Crítico RAE',
+        color: 'rose',
+        tags: ['RAE'],
+        hiddenLayer: 'Speranza evita reducir el arte a mera ilustración didáctica del cambio climático: reivindica su autonomía formal para producir nuevos regímenes de atención.',
+        body: 'El principal acierto de Speranza radica en articular una pedagogía de la mirada lenta. Frente a la anestesia sensorial producida por la sobreexposición a datos catastróficos, el libro demuestra cómo las prácticas artísticas contemporáneas amplían el umbral de lo perceptible —hacia lo microscópico, lo geológico, lo acústico y lo forense— sin renunciar a la densidad poética.',
+        hearts: 12,
+        stars: 8,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-5-2',
+        columnId: 'col-5',
+        title: 'Aporte 2: El Ensayo como Constelación Transdisciplinar',
+        author: 'Valoración Crítica RAE · Metodología de Lectura',
+        modality: 'Balance Crítico RAE',
+        color: 'rose',
+        tags: ['RAE'],
+        hiddenLayer: 'Al cruzar artes visuales con física cuántica, biología vegetal, derecho internacional y narrativa especulativa, rompe las fronteras disciplinares tradicionales.',
+        body: 'La escritura ensayística de Speranza opera como un montaje curatorial en el papel: pone a conversar obras de bienales internacionales con crónicas literarias (Tokarczuk, Schweblin, Sebald) y hallazgos científicos, ofreciendo un modelo fértil para investigar problemas complejos en educación y comunicación.',
+        hearts: 11,
+        stars: 7,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-5-3',
+        columnId: 'col-5',
+        title: 'Límite 1: Circuito Institucional y Huella Material del Arte Contemporáneo',
+        author: 'Valoración Crítica RAE · Tensión Material y Geopolítica',
+        modality: 'Balance Crítico RAE',
+        color: 'rose',
+        tags: ['RAE'],
+        hiddenLayer: '¿Cómo sostener una crítica ecológica desde museos, bienales y fundaciones financiadas por capitales extractivos o con alta huella de carbono?',
+        body: 'Un límite crítico del corpus analizado es su fuerte anclaje en el circuito global de grandes bienales y museos metropolitanos (Venecia, The Met, Documenta). Queda abierta la pregunta por las condiciones materiales de producción y circulación de estas obras, así como por las prácticas comunitarias y populares que operan fuera del cubo blanco.',
+        hearts: 15,
+        stars: 12,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-5-4',
+        columnId: 'col-5',
+        title: 'Límite 2: De la Contemplación Estética a la Acción Política Colectiva',
+        author: 'Valoración Crítica RAE · Mediación Educativa',
+        modality: 'Balance Crítico RAE',
+        color: 'rose',
+        tags: ['RAE'],
+        hiddenLayer: 'Ver lo invisible es una condición necesaria, pero no suficiente, si no se articula con procesos pedagógicos y organizativos situados.',
+        body: 'Si bien las investigaciones de Forensic Architecture tienen incidencia directa en tribunales, otras obras poéticas corren el riesgo de quedarse en una contemplación melancólica de la catástrofe. Para el campo de la Educación y la Comunicación, el desafío consiste en traducir esa sensibilidad en agencia colectiva.',
+        hearts: 13,
+        stars: 10,
+        comments: [],
+        isCustom: false
+      },
+
+      // ==================== COLUMNA 6: PREGUNTAS DETONADORAS (DEBATE) ====================
+      {
+        id: 'card-6-1',
+        columnId: 'col-6',
+        title: 'Pregunta 1: ¿Qué pedagogías de la mirada exige el Antropoceno?',
+        author: 'Eje de Debate · Educación y Percepción',
+        modality: 'Pregunta Detonadora',
+        color: 'amber',
+        tags: ['RAE', 'REFLEXION'],
+        hiddenLayer: 'Desafío para el aula: pasar del consumo acelerado de imágenes a la observación detenida de rastros, escalas y temporalidades profundas.',
+        body: 'Si la escuela y los medios tradicionales nos han entrenado para ver en escalas humanas inmediatas y antropocéntricas, ¿qué dispositivos estéticos, sonoros o cartográficos podemos diseñar en nuestras aulas para enseñar a percibir lo invisible (huellas ecológicas, memorias silenciadas, interdependencias multiespecie)?',
+        hearts: 14,
+        stars: 11,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-6-2',
+        columnId: 'col-6',
+        title: 'Pregunta 2: Contra-forensia ciudadana y verdad en Colombia',
+        author: 'Eje de Debate · Comunicación, Memoria y Justicia',
+        modality: 'Pregunta Detonadora',
+        color: 'amber',
+        tags: ['COLOMBIA', 'FORENSE', 'REFLEXION'],
+        hiddenLayer: 'Articulación entre archivos comunitarios, mapas participativos, periodismo de investigación y prácticas artísticas.',
+        body: 'En un país como Colombia, marcado por la desaparición forzada, el despojo de tierras y los conflictos socioambientales, ¿cómo pueden las herramientas de la contra-forensia y los contra-monumentos fortalecer los procesos de memoria comunitaria frente a las narrativas oficiales o el olvido mediático?',
+        hearts: 16,
+        stars: 13,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-6-3',
+        columnId: 'col-6',
+        title: 'Pregunta 3: Educar y narrar en «cuarta persona»',
+        author: 'Eje de Debate · Ética de la Interconexión',
+        modality: 'Pregunta Detonadora',
+        color: 'amber',
+        tags: ['FORENSE', 'REFLEXION'],
+        hiddenLayer: 'Superar el «yo» aislado del individuo neoliberal para asumir una perspectiva relacional y planetaria.',
+        body: '¿Qué ocurriría si trasladáramos la propuesta de Olga Tokarczuk —narrar desde una cuarta persona que comprende que cada gesto «aquí» repercute «allí»— al diseño de proyectos educativos y comunicativos en nuestros territorios?',
+        hearts: 12,
+        stars: 9,
+        comments: [],
+        isCustom: false
+      },
+
+      // ==================== COLUMNA 7: ESTACIONES MULTIMEDIA (CLASE) ====================
+      {
+        id: 'card-7-1',
+        columnId: 'col-7',
+        title: 'Estación 1: Archivo Audiovisual y Conferencias de Graciela Speranza',
+        author: 'Recurso de Seminario · Lectura e Imagen',
+        modality: 'Estación Multimedia',
+        color: 'sky',
+        tags: ['ESTACION', 'RAE'],
+        mediaLink: 'https://www.anagrama-ed.es/libro/argumentos/lo-que-no-vemos-lo-que-el-arte-ve/9788433964946/A_566',
+        mediaLabel: 'Ficha editorial y fragmento de lectura — Editorial Anagrama',
+        hiddenLayer: 'Material base de consulta para contrastar los capítulos del libro con las piezas visuales desplegadas en las columnas 1 a 4.',
+        body: 'Estación de consulta rápida para verificar citas, índices temáticos y constelaciones de artistas abordados por Graciela Speranza en «Lo que no vemos, lo que el arte ve» (2022).',
+        hearts: 9,
+        stars: 6,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-7-2',
+        columnId: 'col-7',
+        title: 'Estación 2: Plataforma de Investigaciones de Forensic Architecture',
+        author: 'Recurso de Seminario · Laboratorio Contraforense',
+        modality: 'Estación Multimedia',
+        color: 'sky',
+        tags: ['ESTACION', 'FORENSE'],
+        mediaLink: 'https://forensic-architecture.org/',
+        mediaLabel: 'Explorar plataforma interactiva de Forensic Architecture',
+        hiddenLayer: 'Permite navegar por líneas de tiempo sincronizadas, reconstrucciones 3D y análisis de audio y video de casos reales.',
+        body: 'Explora los modelos espaciales y las metodologías de investigación abierta desarrolladas por Forensic Architecture para documentar violencia ambiental y violaciones de derechos humanos alrededor del mundo.',
+        hearts: 11,
+        stars: 8,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-7-3',
+        columnId: 'col-7',
+        title: 'Estación 3: Mapa Sonoro y Visual de la Memoria en Colombia',
+        author: 'Recurso de Seminario · Territorio y Archivo',
+        modality: 'Estación Multimedia',
+        color: 'sky',
+        tags: ['ESTACION', 'COLOMBIA'],
+        mediaLink: 'https://www.museonacional.gov.co/micrositios1/fragmentos/index.html',
+        mediaLabel: 'Visitar micrositio oficial de Fragmentos (Museo Nacional de Colombia)',
+        hiddenLayer: 'Recorrido por las exposiciones y comisiones artísticas hospedadas en el contra-monumento en Bogotá.',
+        body: 'Espacio de exploración documental sobre «Fragmentos» de Doris Salcedo y otras iniciativas de arte, memoria y territorio en Colombia.',
+        hearts: 13,
+        stars: 10,
+        comments: [],
+        isCustom: false
+      },
+
+      // ==================== COLUMNA 8: LABORATORIO Y PLENARIA (ESTUDIANTES) ====================
+      {
+        id: 'card-8-1',
+        columnId: 'col-8',
+        title: 'Consigna del Taller: Hacer visible lo invisible en nuestro territorio',
+        author: 'Guía de Laboratorio · Maestría en Educación y Comunicación',
+        modality: 'Consigna de Laboratorio',
+        color: 'emerald',
+        tags: ['CREACION', 'REFLEXION'],
+        hiddenLayer: 'Usa el botón amarillo «+ Añadir evidencia / reflexión» en la barra superior para publicar tu ficha directamente en esta columna.',
+        body: 'Instrucciones para los equipos de trabajo:\n1. Selecciona un objeto cotidiano, huella ambiental o espacio urbano/rural de tu entorno cercano.\n2. Captura una fotografía y súbela mediante el botón «+ Añadir evidencia / reflexión».\n3. Elige una modalidad:\n   • Modalidad A (4ª persona - Tokarczuk): Narra la biografía profunda y la escala temporal de ese objeto o territorio (máx. 120 palabras).\n   • Modalidad B (Pie de foto contraforense): Revela la historia oculta, las relaciones de poder o el impacto ecológico detrás de la superficie.\n4. Añade una «Capa Oculta» que se revele al pasar el cursor.',
+        hearts: 15,
+        stars: 12,
+        comments: [],
+        isCustom: false
+      },
+      {
+        id: 'card-8-2',
+        columnId: 'col-8',
+        title: 'Ejemplo de Crónica en 4ª Persona: El viaje subterráneo del agua entubada',
+        author: 'Equipo Docente · Modelo de Referencia para el Taller',
+        modality: 'Modalidad A: Voz en cuarta persona (Tokarczuk)',
+        color: 'emerald',
+        tags: ['CREACION', 'COLOMBIA'],
+        hiddenLayer: 'Bajo el asfalto de Bogotá corren antiguos humedales y quebradas canalizadas como el río San Francisco (Eje Ambiental), cuya memoria hídrica reaparece con cada lluvia torrencial.',
+        body: 'Antes de convertirse en cifra de consumo doméstico o en corriente gris bajo las losas de cemento, esta gota descendió por los frailejones del páramo de Chingaza hace miles de ciclos. Recuerda el musgo frío, el paso silencioso del oso andino y el trazado de las antiguas lagunas muiscas. Quienes caminan hoy sobre la avenida apenas perciben el rumor metálico de la alcantarilla, sin sospechar que cada grifo abierto en la ciudad enlaza su sed cotidiana con la respiración lenta de la montaña.',
+        hearts: 14,
+        stars: 10,
+        comments: [],
+        isCustom: false
+      }
+    ];
+
+    // Estado de la aplicación
+    let cards = [];
+    let viewMode = 'shelf';
+    let currentFilterTag = 'ALL';
+    let searchQuery = '';
+    let isDarkTheme = true;
+    let isUnveilMode = false;
+    let activeModalCardId = null;
+    let uploadedImageDataUrl = '';
+
+    // Cargar tarjetas desde localStorage o inicializar con las 27 base
+    function loadCardsFromStorage() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            cards = parsed;
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('No se pudo leer localStorage, cargando fichas base:', e);
+      }
+      cards = JSON.parse(JSON.stringify(INITIAL_CARDS));
+      saveCardsToStorage();
+    }
+
+    function saveCardsToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+      } catch (e) {
+        console.warn('No se pudo guardar en localStorage:', e);
+      }
+    }
+
+    // Extraer ID de video de YouTube desde cualquier formato de URL
+    function extractYouTubeId(url) {
+      if (!url || typeof url !== 'string') return null;
+      const regExp = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+      const match = url.match(regExp);
+      return match ? match[1] : null;
+    }
+
+    // Extraer parámetro de tiempo (t=12s -> start=12) si existe en URL de YouTube
+    function extractYouTubeStart(url) {
+      if (!url || typeof url !== 'string') return 0;
+      const match = url.match(/[?&](?:t|start)=(\d+)/);
+      return match ? parseInt(match[1], 10) : 0;
+    }
+
+    // Renderizar bloque de video embebido (soporta YouTube y archivos .mp4/.webm)
+    function renderVideoEmbedHtml(url, compact) {
+      if (!url) return '';
+      const ytId = extractYouTubeId(url);
+      if (ytId) {
+        const startSec = extractYouTubeStart(url);
+        const startParam = startSec > 0 ? '&start=' + startSec : '';
+        const heightClass = compact ? 'h-44' : 'h-64 sm:h-80';
+        return (
+          '<div class="rounded-xl overflow-hidden border border-slate-700/80 bg-black shadow-inner">' +
+            '<iframe class="w-full ' + heightClass + '" src="https://www.youtube.com/embed/' + ytId + '?rel=0' + startParam + '" title="Video embebido" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>' +
+          '</div>'
+        );
+      }
+      if (/\.(mp4|webm|ogg)(\?.*)?$/i.test(url)) {
+        const maxH = compact ? 'max-h-48' : 'max-h-96';
+        return (
+          '<div class="rounded-xl overflow-hidden border border-slate-700/80 bg-black">' +
+            '<video src="' + escapeHtml(url) + '" controls playsinline muted loop preload="metadata" class="w-full ' + maxH + ' object-contain mx-auto"></video>' +
+          '</div>'
+        );
+      }
+      return '';
+    }
+
+    // Escapar HTML para prevenir inyecciones en texto dinámico
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // Clases de color por tarjeta
+    function getCardAccentClasses(color) {
+      const map = {
+        amber: {
+          border: 'border-amber-500/40 hover:border-amber-400/80',
+          badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+          strip: 'bg-amber-400'
+        },
+        emerald: {
+          border: 'border-emerald-500/40 hover:border-emerald-400/80',
+          badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+          strip: 'bg-emerald-400'
+        },
+        sky: {
+          border: 'border-sky-500/40 hover:border-sky-400/80',
+          badge: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+          strip: 'bg-sky-400'
+        },
+        rose: {
+          border: 'border-rose-500/40 hover:border-rose-400/80',
+          badge: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+          strip: 'bg-rose-400'
+        },
+        violet: {
+          border: 'border-violet-500/40 hover:border-violet-400/80',
+          badge: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
+          strip: 'bg-violet-400'
+        },
+        stone: {
+          border: 'border-stone-500/40 hover:border-stone-400/80',
+          badge: 'bg-stone-500/20 text-stone-200 border-stone-500/35',
+          strip: 'bg-stone-400'
+        }
+      };
+      return map[color] || map.amber;
+    }
+
+    // Filtrar tarjetas según búsqueda y categoría activa
+    function getFilteredCards() {
+      return cards.filter((card) => {
+        const matchesTag =
+          currentFilterTag === 'ALL' ||
+          (Array.isArray(card.tags) && card.tags.includes(currentFilterTag));
+
+        if (!matchesTag) return false;
+
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        const inTitle = (card.title || '').toLowerCase().includes(q);
+        const inAuthor = (card.author || '').toLowerCase().includes(q);
+        const inBody = (card.body || '').toLowerCase().includes(q);
+        const inHidden = (card.hiddenLayer || '').toLowerCase().includes(q);
+        const inModality = (card.modality || '').toLowerCase().includes(q);
+        return inTitle || inAuthor || inBody || inHidden || inModality;
+      });
+    }
+
+    // Construir HTML de una tarjeta individual
+    function renderCardHtml(card, showColumnTag) {
+      const accent = getCardAccentClasses(card.color);
+      const colObj = COLUMNS.find((c) => c.id === card.columnId);
+      const cardBgClass = isDarkTheme
+        ? 'bg-slate-900/90 text-slate-100 shadow-xl shadow-black/40'
+        : 'bg-white/95 text-slate-900 shadow-md shadow-slate-300/60';
+      const subTextClass = isDarkTheme ? 'text-slate-400' : 'text-slate-600';
+      const bodyTextClass = isDarkTheme ? 'text-slate-300' : 'text-slate-700';
+
+      // Galería múltiple o imagen individual
+      let mediaVisualHtml = '';
+      if (Array.isArray(card.galleryImages) && card.galleryImages.length > 0) {
+        const gridCols = card.galleryImages.length >= 3 ? 'grid-cols-3' : 'grid-cols-2';
+        const thumbs = card.galleryImages
+          .map(
+            (imgUrl) =>
+              '<div class="aspect-square overflow-hidden rounded-lg bg-slate-950 border border-slate-800">' +
+                '<img src="' + escapeHtml(window.normalizeImageUrl(imgUrl)) + '" alt="' + escapeHtml(card.title) + '" onerror="handleImgFallback(this)" loading="lazy" class="w-full h-full object-cover hover:scale-105 transition duration-300" />' +
+              '</div>'
+          )
+          .join('');
+        mediaVisualHtml = '<div class="grid ' + gridCols + ' gap-1.5">' + thumbs + '</div>';
+      } else if (card.imageUrl) {
+        mediaVisualHtml =
+          '<div class="rounded-xl overflow-hidden border border-slate-700/60 bg-slate-950 max-h-48">' +
+            '<img src="' + escapeHtml(window.normalizeImageUrl(card.imageUrl)) + '" alt="' + escapeHtml(card.title) + '" onerror="handleImgFallback(this)" loading="lazy" class="w-full h-44 object-cover hover:scale-[1.02] transition duration-300" />' +
+          '</div>';
+      }
+
+      // Cita textual asociada a imagen
+      const quoteHtml = card.imageQuote
+        ? '<blockquote class="px-3 py-2 rounded-lg bg-slate-950/75 border-l-2 border-amber-400 font-art italic text-xs sm:text-[13px] text-amber-200/95 leading-snug">' +
+            escapeHtml(card.imageQuote) +
+          '</blockquote>'
+        : '';
+
+      // Videos embebidos
+      let videosHtml = '';
+      if (Array.isArray(card.videoUrls) && card.videoUrls.length > 0) {
+        videosHtml =
+          '<div class="space-y-2" onclick="event.stopPropagation()">' +
+            card.videoUrls.map((vUrl) => renderVideoEmbedHtml(vUrl, true)).join('') +
+          '</div>';
+      }
+
+      // Enlace externo
+      const linkHtml = card.mediaLink
+        ? '<a href="' + escapeHtml(card.mediaLink) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-300 text-xs font-medium transition">' +
+            '<i data-lucide="external-link" class="w-3.5 h-3.5 shrink-0"></i>' +
+            '<span class="truncate">' + escapeHtml(card.mediaLabel || card.mediaLink) + '</span>' +
+          '</a>'
+        : '';
+
+      // Enlaces comentados de casos
+      let annotatedLinksHtml = '';
+      if (Array.isArray(card.annotatedLinks) && card.annotatedLinks.length > 0) {
+        annotatedLinksHtml =
+          '<div class="space-y-2 pt-1" onclick="event.stopPropagation()">' +
+            card.annotatedLinks
+              .map(
+                (item) =>
+                  '<div class="p-2.5 rounded-xl bg-slate-950/75 border border-violet-500/30 space-y-1">' +
+                    '<a href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-300 hover:text-amber-300 underline decoration-violet-500/50 transition">' +
+                      '<i data-lucide="arrow-up-right" class="w-3.5 h-3.5 shrink-0"></i>' +
+                      '<span>' + escapeHtml(item.title) + '</span>' +
+                    '</a>' +
+                    '<p class="text-[11px] text-slate-300 leading-relaxed">' + escapeHtml(item.description) + '</p>' +
+                  '</div>'
+              )
+              .join('') +
+          '</div>';
+      }
+
+      // Cita literaria en cursiva al cierre
+      const literaryExcerptHtml = card.literaryExcerpt
+        ? '<div class="p-2.5 rounded-xl bg-slate-950/75 border border-violet-500/30 space-y-1">' +
+            '<div class="font-mono text-[9px] uppercase tracking-wider text-violet-300">' + escapeHtml(card.literaryExcerptLabel || 'Cita textual') + '</div>' +
+            '<p class="italic text-[11px] text-slate-300 line-clamp-6 leading-relaxed">' + escapeHtml(card.literaryExcerpt) + '</p>' +
+          '</div>'
+        : '';
+
+      // Capa oculta (solo si existe)
+      const hiddenHtml = card.hiddenLayer
+        ? '<div class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 space-y-1">' +
+            '<div class="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-amber-300">' +
+              '<i data-lucide="eye-off" class="w-3 h-3"></i>' +
+              '<span>Capa Oculta (pasa el cursor)</span>' +
+            '</div>' +
+            '<p class="hidden-veil text-[11px] text-amber-100/90 leading-snug">' + escapeHtml(card.hiddenLayer) + '</p>' +
+          '</div>'
+        : '';
+
+      const columnPillHtml =
+        showColumnTag && colObj
+          ? '<span class="font-mono text-[9px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 border border-slate-700 truncate max-w-full">' +
+              escapeHtml(colObj.title) +
+            '</span>'
+          : '';
+
+      const commentCount = Array.isArray(card.comments) ? card.comments.length : 0;
+
+      return (
+        '<article onclick="openDetailModal(\'' + card.id + '\')" class="padlet-card group relative rounded-2xl border ' + accent.border + ' ' + cardBgClass + ' p-3.5 flex flex-col gap-2.5 cursor-pointer transition-all duration-200 hover:-translate-y-0.5">' +
+          '<div class="flex items-center justify-between gap-2 flex-wrap">' +
+            '<span class="font-mono text-[10px] px-2 py-0.5 rounded-full border ' + accent.badge + '">' +
+              escapeHtml(card.modality) +
+            '</span>' +
+            columnPillHtml +
+          '</div>' +
+          '<div>' +
+            '<h3 class="font-art italic text-lg sm:text-[19px] font-bold leading-snug group-hover:text-amber-300 transition">' +
+              escapeHtml(card.title) +
+            '</h3>' +
+            '<p class="text-[11px] ' + subTextClass + ' mt-0.5">' + escapeHtml(card.author) + '</p>' +
+          '</div>' +
+          mediaVisualHtml +
+          quoteHtml +
+          videosHtml +
+          linkHtml +
+          '<p class="text-xs ' + bodyTextClass + ' leading-relaxed line-clamp-6 whitespace-pre-line">' +
+            escapeHtml(card.body) +
+          '</p>' +
+          annotatedLinksHtml +
+          literaryExcerptHtml +
+          hiddenHtml +
+          '<div class="pt-2 mt-auto border-t border-slate-800/70 flex items-center justify-between text-[11px] text-slate-400">' +
+            '<div class="flex items-center gap-2.5">' +
+              '<button type="button" onclick="event.stopPropagation(); toggleReaction(\'' + card.id + '\', \'heart\')" class="inline-flex items-center gap-1 hover:text-rose-400 transition cursor-pointer">' +
+                '<i data-lucide="heart" class="w-3.5 h-3.5 text-rose-400"></i>' +
+                '<span>' + (card.hearts || 0) + '</span>' +
+              '</button>' +
+              '<button type="button" onclick="event.stopPropagation(); toggleReaction(\'' + card.id + '\', \'star\')" class="inline-flex items-center gap-1 hover:text-amber-300 transition cursor-pointer">' +
+                '<i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>' +
+                '<span>' + (card.stars || 0) + '</span>' +
+              '</button>' +
+              '<span class="inline-flex items-center gap-1">' +
+                '<i data-lucide="message-square" class="w-3.5 h-3.5 text-sky-400"></i>' +
+                '<span>' + commentCount + '</span>' +
+              '</span>' +
+            '</div>' +
+            '<span class="font-mono text-[10px] text-amber-400/80 group-hover:translate-x-0.5 transition inline-flex items-center gap-0.5">' +
+              'Ampliar <i data-lucide="maximize-2" class="w-3 h-3"></i>' +
+            '</span>' +
+          '</div>' +
+        '</article>'
+      );
+    }
+
+    // Renderizar navegación rápida entre columnas
+    function renderQuickNav() {
+      const nav = document.getElementById('columnQuickNav');
+      if (!nav) return;
+      if (viewMode !== 'shelf') {
+        nav.classList.add('hidden');
+        return;
+      }
+      nav.classList.remove('hidden');
+      const buttonsHtml = COLUMNS.map(
+        (col) =>
+          '<button onclick="scrollToColumn(\'' + col.id + '\')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-slate-800 whitespace-nowrap transition cursor-pointer shrink-0">' +
+            '<span class="w-2 h-2 rounded-full ' + col.dot + '"></span>' +
+            '<span>' + escapeHtml(col.title) + '</span>' +
+          '</button>'
+      ).join('');
+      nav.innerHTML = '<span class="font-mono text-slate-500 uppercase mr-1 shrink-0">Ir a columna:</span>' + buttonsHtml;
+    }
+
+    // Renderizado principal del tablero
+    function renderBoard() {
+      const container = document.getElementById('boardContainer');
+      const filtered = getFilteredCards();
+
+      const badge = document.getElementById('totalCardsBadge');
+      if (badge) {
+        badge.textContent = filtered.length === cards.length
+          ? cards.length + ' fichas activas'
+          : filtered.length + ' de ' + cards.length + ' fichas';
+      }
+
+      renderQuickNav();
+
+      if (viewMode === 'shelf') {
+        const colBgClass = isDarkTheme
+          ? 'bg-slate-950/60 border-slate-800/80'
+          : 'bg-white/75 border-slate-300/80';
+        const colTitleClass = isDarkTheme ? 'text-amber-50' : 'text-slate-900';
+        const colSubClass = isDarkTheme ? 'text-slate-400' : 'text-slate-600';
+
+        const columnsHtml = COLUMNS.map((col) => {
+          const colCards = filtered.filter((c) => c.columnId === col.id);
+          const cardsListHtml =
+            colCards.length > 0
+              ? colCards.map((c) => renderCardHtml(c, false)).join('')
+              : '<div class="p-6 rounded-2xl border border-dashed border-slate-700/70 text-center text-xs text-slate-500">Sin fichas que coincidan con el filtro en esta columna.</div>';
+
+          return (
+            '<section id="section-' + col.id + '" class="w-[330px] sm:w-[365px] shrink-0 flex flex-col max-h-[calc(100vh-248px)] rounded-2xl border ' + colBgClass + ' backdrop-blur-md overflow-hidden">' +
+              '<div class="p-3.5 border-b border-slate-800/70 border-t-2 ' + col.accent + ' flex items-start justify-between gap-2">' +
+                '<div class="min-w-0">' +
+                  '<div class="flex items-center gap-2">' +
+                    '<span class="w-2.5 h-2.5 rounded-full ' + col.dot + ' shrink-0"></span>' +
+                    '<h2 class="font-art italic text-lg font-bold ' + colTitleClass + ' leading-tight">' +
+                      escapeHtml(col.title) +
+                    '</h2>' +
+                  '</div>' +
+                  '<p class="text-[11px] ' + colSubClass + ' mt-1">' + escapeHtml(col.subtitle) + '</p>' +
+                '</div>' +
+                '<span class="font-mono text-[11px] px-2 py-0.5 rounded-full bg-slate-800/90 text-slate-300 shrink-0">' +
+                  colCards.length +
+                '</span>' +
+              '</div>' +
+              '<div class="p-3 space-y-3 overflow-y-auto col-scroll flex-1">' +
+                cardsListHtml +
+                '<button onclick="openCreateModal(\'' + col.id + '\')" class="w-full py-2.5 rounded-xl border border-dashed border-slate-700 hover:border-amber-400/70 text-slate-400 hover:text-amber-300 text-xs font-medium inline-flex items-center justify-center gap-1.5 transition cursor-pointer">' +
+                  '<i data-lucide="plus" class="w-3.5 h-3.5"></i>' +
+                  '<span>Añadir ficha aquí</span>' +
+                '</button>' +
+              '</div>' +
+            '</section>'
+          );
+        }).join('');
+
+        container.innerHTML =
+          '<div id="shelfWrapper" class="flex gap-4 overflow-x-auto shelf-scroll pb-4 flex-1 items-start">' +
+            columnsHtml +
+          '</div>';
+      } else {
+        if (filtered.length === 0) {
+          container.innerHTML =
+            '<div class="p-12 rounded-2xl border border-dashed border-slate-700 text-center text-slate-400 max-w-lg mx-auto my-12">' +
+              'No se encontraron tarjetas con ese criterio de búsqueda o filtro.' +
+            '</div>';
+        } else {
+          container.innerHTML =
+            '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-8">' +
+              filtered.map((c) => renderCardHtml(c, true)).join('') +
+            '</div>';
+        }
+      }
+
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    }
+
+    // Desplazar suavemente a una columna
+    window.scrollToColumn = function (colId) {
+      const target = document.getElementById('section-' + colId);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+      }
+    };
+
+    // Cambiar vista (Estantería vs Muro)
+    window.setViewMode = function (mode) {
+      viewMode = mode;
+      const btnShelf = document.getElementById('btnViewShelf');
+      const btnGrid = document.getElementById('btnViewGrid');
+      if (mode === 'shelf') {
+        btnShelf.className = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-amber-300 transition cursor-pointer';
+        btnGrid.className = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition cursor-pointer';
+      } else {
+        btnGrid.className = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-amber-300 transition cursor-pointer';
+        btnShelf.className = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition cursor-pointer';
+      }
+      renderBoard();
+    };
+
+    // Filtrar por etiqueta
+    window.setFilterTag = function (tag) {
+      currentFilterTag = tag;
+      document.querySelectorAll('.filter-pill').forEach((btn) => {
+        if (btn.dataset.tag === tag) {
+          btn.classList.add('bg-amber-400', 'text-slate-950');
+          btn.classList.remove('bg-slate-800/90', 'text-slate-300');
+        } else {
+          btn.classList.remove('bg-amber-400', 'text-slate-950');
+          btn.classList.add('bg-slate-800/90', 'text-slate-300');
+        }
+      });
+      renderBoard();
+    };
+
+    // Búsqueda en tiempo real
+    window.handleSearch = function (val) {
+      searchQuery = val || '';
+      const clearBtn = document.getElementById('clearSearchBtn');
+      if (searchQuery.trim()) {
+        clearBtn.classList.remove('hidden');
+      } else {
+        clearBtn.classList.add('hidden');
+      }
+      renderBoard();
+    };
+
+    window.clearSearch = function () {
+      const input = document.getElementById('searchInput');
+      if (input) input.value = '';
+      handleSearch('');
+    };
+
+    // Alternar modo Lente de Revelado (Lo Oculto)
+    window.toggleUnveilMode = function () {
+      isUnveilMode = !isUnveilMode;
+      const overlay = document.getElementById('darkroomOverlay');
+      const label = document.getElementById('unveilLabel');
+      const btn = document.getElementById('btnUnveilMode');
+      if (isUnveilMode) {
+        document.body.classList.add('unveiled-mode');
+        overlay.classList.remove('hidden');
+        if (label) label.textContent = 'Ocultar velo';
+        btn.classList.add('bg-amber-400/20', 'border-amber-400');
+        showToast('Lente forense activado: todas las capas ocultas son visibles.');
+      } else {
+        document.body.classList.remove('unveiled-mode');
+        overlay.classList.add('hidden');
+        if (label) label.textContent = 'Revelar lo oculto';
+        btn.classList.remove('bg-amber-400/20', 'border-amber-400');
+      }
+    };
+
+    // Seguir el puntero con la linterna forense
+    document.addEventListener('mousemove', (e) => {
+      if (!isUnveilMode) return;
+      document.documentElement.style.setProperty('--mx', e.clientX + 'px');
+      document.documentElement.style.setProperty('--my', e.clientY + 'px');
+    });
+
+    // Alternar tema oscuro / claro
+    window.toggleTheme = function () {
+      isDarkTheme = !isDarkTheme;
+      const body = document.body;
+      const header = document.getElementById('appHeader');
+      const title = document.getElementById('boardTitle');
+      const footerCard = document.getElementById('footerCard');
+      if (isDarkTheme) {
+        body.classList.remove('board-bg-light', 'text-slate-900');
+        body.classList.add('board-bg-dark', 'text-slate-100');
+        header.classList.remove('bg-white/90', 'border-slate-300');
+        header.classList.add('bg-slate-950/85', 'border-slate-800/80');
+        title.classList.remove('text-slate-900');
+        title.classList.add('text-amber-50');
+        if (footerCard) {
+          footerCard.className = 'inline-flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 px-4 py-2 rounded-2xl bg-slate-950/80 backdrop-blur-md border border-slate-800/90 shadow-lg text-xs text-slate-200 transition-colors';
+        }
+      } else {
+        body.classList.remove('board-bg-dark', 'text-slate-100');
+        body.classList.add('board-bg-light', 'text-slate-900');
+        header.classList.remove('bg-slate-950/85', 'border-slate-800/80');
+        header.classList.add('bg-white/90', 'border-slate-300');
+        title.classList.remove('text-amber-50');
+        title.classList.add('text-slate-900');
+        if (footerCard) {
+          footerCard.className = 'inline-flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 px-4 py-2 rounded-2xl bg-white/90 backdrop-blur-md border border-slate-300 shadow-md text-xs text-slate-800 transition-colors';
+        }
+      }
+      renderBoard();
+    };
+
+    // Reacciones en tarjeta
+    window.toggleReaction = function (cardId, type) {
+      const card = cards.find((c) => c.id === cardId);
+      if (!card) return;
+      if (type === 'heart') {
+        card.hearts = (card.hearts || 0) + 1;
+      } else if (type === 'star') {
+        card.stars = (card.stars || 0) + 1;
+      }
+      saveCardsToStorage();
+      renderBoard();
+      if (activeModalCardId === cardId) {
+        document.getElementById('detailHeartCount').textContent = card.hearts || 0;
+        document.getElementById('detailStarCount').textContent = card.stars || 0;
+      }
+    };
+
+    window.toggleReactionFromModal = function (type) {
+      if (activeModalCardId) {
+        toggleReaction(activeModalCardId, type);
+      }
+    };
+
+    // ==================== MODAL DE LECTURA AMPLIADA ====================
+    window.openDetailModal = function (cardId) {
+      const card = cards.find((c) => c.id === cardId);
+      if (!card) return;
+      activeModalCardId = cardId;
+
+      const colObj = COLUMNS.find((c) => c.id === card.columnId);
+      document.getElementById('detailColumnBadge').textContent = colObj ? colObj.title : 'Columna';
+      document.getElementById('detailModalityBadge').textContent = card.modality || '';
+      document.getElementById('detailTitle').textContent = card.title || '';
+      document.getElementById('detailAuthor').textContent = card.author || '';
+      document.getElementById('detailBody').textContent = card.body || '';
+      document.getElementById('detailHeartCount').textContent = card.hearts || 0;
+      document.getElementById('detailStarCount').textContent = card.stars || 0;
+
+      // Galería o imagen individual
+      const imgWrap = document.getElementById('detailImageWrapper');
+      const galleryGrid = document.getElementById('detailGalleryGrid');
+      const singleImg = document.getElementById('detailImage');
+      const replaceLabel = document.getElementById('detailReplaceImgLabel');
+
+      if (Array.isArray(card.galleryImages) && card.galleryImages.length > 0) {
+        imgWrap.classList.remove('hidden');
+        galleryGrid.classList.remove('hidden');
+        singleImg.classList.add('hidden');
+        replaceLabel.classList.add('hidden');
+        galleryGrid.innerHTML = card.galleryImages
+          .map(
+            (u) =>
+              '<div class="rounded-lg overflow-hidden bg-black border border-slate-800">' +
+                '<img src="' + escapeHtml(window.normalizeImageUrl(u)) + '" alt="' + escapeHtml(card.title) + '" onerror="handleImgFallback(this)" class="w-full h-56 object-cover" />' +
+              '</div>'
+          )
+          .join('');
+      } else if (card.imageUrl) {
+        imgWrap.classList.remove('hidden');
+        galleryGrid.classList.add('hidden');
+        singleImg.classList.remove('hidden');
+        replaceLabel.classList.remove('hidden');
+        singleImg.src = window.normalizeImageUrl(card.imageUrl);
+        singleImg.alt = card.title || 'Evidencia visual';
+      } else {
+        imgWrap.classList.add('hidden');
+      }
+
+      // Cita textual asociada a la imagen
+      const quoteWrap = document.getElementById('detailQuoteWrapper');
+      if (card.imageQuote) {
+        quoteWrap.classList.remove('hidden');
+        quoteWrap.textContent = card.imageQuote;
+      } else {
+        quoteWrap.classList.add('hidden');
+      }
+
+      // Videos embebidos
+      const videoWrap = document.getElementById('detailVideoWrapper');
+      if (Array.isArray(card.videoUrls) && card.videoUrls.length > 0) {
+        videoWrap.classList.remove('hidden');
+        videoWrap.innerHTML = card.videoUrls.map((vUrl) => renderVideoEmbedHtml(vUrl, false)).join('');
+      } else {
+        videoWrap.classList.add('hidden');
+        videoWrap.innerHTML = '';
+      }
+
+      // Enlace externo
+      const linkWrap = document.getElementById('detailLinkWrapper');
+      if (card.mediaLink) {
+        linkWrap.classList.remove('hidden');
+        linkWrap.innerHTML =
+          '<a href="' + escapeHtml(card.mediaLink) + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/40 text-sky-300 text-xs sm:text-sm font-medium transition">' +
+            '<i data-lucide="external-link" class="w-4 h-4"></i>' +
+            '<span>' + escapeHtml(card.mediaLabel || card.mediaLink) + '</span>' +
+          '</a>';
+      } else {
+        linkWrap.classList.add('hidden');
+        linkWrap.innerHTML = '';
+      }
+
+      // Cita literaria en cursiva al cierre
+      const litWrap = document.getElementById('detailLiteraryExcerptWrapper');
+      if (card.literaryExcerpt) {
+        litWrap.classList.remove('hidden');
+        document.getElementById('detailLiteraryExcerptLabel').textContent = card.literaryExcerptLabel || 'Cita textual';
+        document.getElementById('detailLiteraryExcerptText').textContent = card.literaryExcerpt;
+      } else {
+        litWrap.classList.add('hidden');
+      }
+
+      // Capa oculta
+      const hiddenWrap = document.getElementById('detailHiddenLayerWrapper');
+      if (card.hiddenLayer) {
+        hiddenWrap.classList.remove('hidden');
+        document.getElementById('detailHiddenLayerText').textContent = card.hiddenLayer;
+      } else {
+        hiddenWrap.classList.add('hidden');
+      }
+
+      // Enlaces comentados de casos
+      const annotatedWrap = document.getElementById('detailAnnotatedLinksWrapper');
+      if (Array.isArray(card.annotatedLinks) && card.annotatedLinks.length > 0) {
+        annotatedWrap.classList.remove('hidden');
+        annotatedWrap.innerHTML = card.annotatedLinks
+          .map(
+            (item) =>
+              '<div class="p-4 rounded-xl bg-slate-950/85 border border-violet-500/35 space-y-1.5">' +
+                '<a href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-300 hover:text-amber-300 underline decoration-violet-500/50 transition">' +
+                  '<i data-lucide="external-link" class="w-4 h-4 shrink-0"></i>' +
+                  '<span>' + escapeHtml(item.title) + '</span>' +
+                '</a>' +
+                '<p class="text-xs sm:text-sm text-slate-200 leading-relaxed">' + escapeHtml(item.description) + '</p>' +
+              '</div>'
+          )
+          .join('');
+      } else {
+        annotatedWrap.classList.add('hidden');
+        annotatedWrap.innerHTML = '';
+      }
+
+      // Etiquetas
+      const tagsWrap = document.getElementById('detailTags');
+      tagsWrap.innerHTML = (card.tags || [])
+        .map(
+          (t) =>
+            '<span class="font-mono text-[10px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">#' +
+            escapeHtml(t) +
+            '</span>'
+        )
+        .join('');
+
+      // Botón eliminar (solo fichas creadas por estudiantes)
+      const delBtn = document.getElementById('detailDeleteBtn');
+      if (card.isCustom) {
+        delBtn.classList.remove('hidden');
+      } else {
+        delBtn.classList.add('hidden');
+      }
+
+      renderModalComments(card);
+
+      const modal = document.getElementById('detailModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (window.lucide) window.lucide.createIcons();
+    };
+
+    window.closeDetailModal = function () {
+      const modal = document.getElementById('detailModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      // Detener reproducción de iframes/videos al cerrar
+      const videoWrap = document.getElementById('detailVideoWrapper');
+      if (videoWrap) videoWrap.innerHTML = '';
+      activeModalCardId = null;
+    };
+
+    window.replaceCardImage = function (event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file || !activeModalCardId) return;
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const card = cards.find((c) => c.id === activeModalCardId);
+        if (!card) return;
+        card.imageUrl = e.target.result;
+        delete card.galleryImages;
+        saveCardsToStorage();
+        document.getElementById('detailImage').src = card.imageUrl;
+        renderBoard();
+        showToast('Imagen actualizada localmente en la ficha.');
+      };
+      reader.readAsDataURL(file);
+    };
+
+    function renderModalComments(card) {
+      const list = document.getElementById('detailCommentsList');
+      const countEl = document.getElementById('detailCommentCount');
+      const comments = Array.isArray(card.comments) ? card.comments : [];
+      countEl.textContent = comments.length;
+
+      if (comments.length === 0) {
+        list.innerHTML = '<p class="text-xs text-slate-500 italic">Aún no hay anotaciones en esta ficha. Sé el primero en comentar.</p>';
+        return;
+      }
+
+      list.innerHTML = comments
+        .map(
+          (cm) =>
+            '<div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">' +
+              '<div class="flex items-center justify-between text-[11px]">' +
+                '<span class="font-semibold text-amber-300">' + escapeHtml(cm.author) + '</span>' +
+                '<span class="font-mono text-[10px] text-slate-500">' + escapeHtml(cm.date) + '</span>' +
+              '</div>' +
+              '<p class="text-xs text-slate-200 leading-relaxed">' + escapeHtml(cm.text) + '</p>' +
+            '</div>'
+        )
+        .join('');
+    }
+
+    window.submitComment = function (event) {
+      event.preventDefault();
+      if (!activeModalCardId) return;
+      const authorInput = document.getElementById('commentAuthorInput');
+      const textInput = document.getElementById('commentTextInput');
+      const author = authorInput.value.trim();
+      const text = textInput.value.trim();
+      if (!author || !text) return;
+
+      const card = cards.find((c) => c.id === activeModalCardId);
+      if (!card) return;
+      if (!Array.isArray(card.comments)) card.comments = [];
+
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) + ' ' + now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+      card.comments.push({ author, text, date: dateStr });
+      saveCardsToStorage();
+      renderModalComments(card);
+      renderBoard();
+      textInput.value = '';
+      showToast('Anotación publicada en la ficha.');
+    };
+
+    window.deleteCurrentCard = function () {
+      if (!activeModalCardId) return;
+      cards = cards.filter((c) => c.id !== activeModalCardId);
+      saveCardsToStorage();
+      closeDetailModal();
+      renderBoard();
+      showToast('Ficha eliminada del tablero.');
+    };
+
+    // ==================== MODAL DE CREACIÓN DE FICHA ====================
+    window.openCreateModal = function (preselectedColId) {
+      const select = document.getElementById('inputColumn');
+      select.innerHTML = COLUMNS.map(
+        (col) => '<option value="' + col.id + '">' + escapeHtml(col.title) + '</option>'
+      ).join('');
+      select.value = preselectedColId || 'col-8';
+
+      const modal = document.getElementById('createModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (window.lucide) window.lucide.createIcons();
+    };
+
+    window.closeCreateModal = function () {
+      const modal = document.getElementById('createModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    };
+
+    window.updateWordCounter = function (text) {
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      const counter = document.getElementById('wordCounter');
+      counter.textContent = words + ' / 120 palabras';
+      if (words > 120) {
+        counter.className = 'font-mono text-[11px] text-amber-400';
+      } else {
+        counter.className = 'font-mono text-[11px] text-emerald-400';
+      }
+    };
+
+    window.selectCardColor = function (color) {
+      document.getElementById('inputCardColor').value = color;
+      document.querySelectorAll('.color-dot').forEach((dot) => {
+        if (dot.dataset.color === color) {
+          dot.classList.add('ring-2', 'ring-white', 'opacity-100');
+          dot.classList.remove('opacity-70');
+        } else {
+          dot.classList.remove('ring-2', 'ring-white', 'opacity-100');
+          dot.classList.add('opacity-70');
+        }
+      });
+    };
+
+    window.handleImageUpload = function (event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        uploadedImageDataUrl = e.target.result;
+        document.getElementById('uploadPreviewImg').src = uploadedImageDataUrl;
+        document.getElementById('uploadPreviewBox').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    };
+
+    window.clearUploadedImage = function () {
+      uploadedImageDataUrl = '';
+      document.getElementById('inputImageFile').value = '';
+      document.getElementById('uploadPreviewBox').classList.add('hidden');
+    };
+
+    window.handleCreateCard = function (event) {
+      event.preventDefault();
+      const columnId = document.getElementById('inputColumn').value;
+      const modality = document.getElementById('inputModality').value;
+      const title = document.getElementById('inputTitle').value.trim();
+      const author = document.getElementById('inputAuthor').value.trim();
+      const body = document.getElementById('inputBody').value.trim();
+      const hiddenLayer = document.getElementById('inputHiddenLayer').value.trim();
+      const urlImg = document.getElementById('inputImageUrl').value.trim();
+      const mediaLink = document.getElementById('inputMediaLink').value.trim();
+      const color = document.getElementById('inputCardColor').value || 'amber';
+
+      if (!title || !author || !body) return;
+
+      const finalImageUrl = uploadedImageDataUrl || urlImg || '';
+      const isVideoUrl = extractYouTubeId(mediaLink) || /\.(mp4|webm|ogg)(\?.*)?$/i.test(mediaLink);
+
+      const tags = ['CREACION'];
+      if (modality.includes('Reflexión')) tags.push('REFLEXION');
+      if (modality.includes('contraforense')) tags.push('FORENSE');
+      if (columnId === 'col-4') tags.push('COLOMBIA');
+
+      const newCard = {
+        id: 'card-custom-' + Date.now(),
+        columnId,
+        title,
+        author,
+        modality,
+        color,
+        tags,
+        imageUrl: finalImageUrl,
+        videoUrls: isVideoUrl ? [mediaLink] : [],
+        mediaLink: !isVideoUrl && mediaLink ? mediaLink : '',
+        mediaLabel: !isVideoUrl && mediaLink ? 'Recurso multimedia adjunto' : '',
+        hiddenLayer,
+        body,
+        hearts: 1,
+        stars: 1,
+        comments: [],
+        isCustom: true
+      };
+
+      cards.push(newCard);
+      saveCardsToStorage();
+
+      // Limpiar formulario
+      document.getElementById('inputTitle').value = '';
+      document.getElementById('inputAuthor').value = '';
+      document.getElementById('inputBody').value = '';
+      document.getElementById('inputHiddenLayer').value = '';
+      document.getElementById('inputImageUrl').value = '';
+      document.getElementById('inputMediaLink').value = '';
+      clearUploadedImage();
+      updateWordCounter('');
+
+      closeCreateModal();
+      renderBoard();
+      scrollToColumn(columnId);
+      showToast('Evidencia publicada correctamente en el tablero.');
+    };
+
+    // ==================== REINICIO Y EXPORTACIÓN ====================
+    window.openResetModal = function () {
+      const modal = document.getElementById('resetModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    };
+
+    window.closeResetModal = function () {
+      const modal = document.getElementById('resetModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    };
+
+    window.confirmResetBoard = function () {
+      cards = JSON.parse(JSON.stringify(INITIAL_CARDS));
+      saveCardsToStorage();
+      closeResetModal();
+      renderBoard();
+      showToast('Tablero restaurado a sus 27 fichas iniciales.');
+    };
+
+    window.exportMarkdown = function () {
+      let md = '# Sondear la oscuridad del presente. Lo que no vemos, lo que el arte ve\n';
+      md += 'Graciela Speranza (2022) — Cartografía Crítica y Laboratorio RAE\n\n';
+
+      COLUMNS.forEach((col) => {
+        md += '## ' + col.title + '\n';
+        md += '_' + col.subtitle + '_\n\n';
+        const colCards = cards.filter((c) => c.columnId === col.id);
+        colCards.forEach((c) => {
+          md += '### ' + c.title + '\n';
+          md += '- **Autoría / Obra:** ' + c.author + '\n';
+          md += '- **Modalidad:** ' + c.modality + '\n';
+          if (c.mediaLink) {
+            md += '- **Enlace:** [' + (c.mediaLabel || c.mediaLink) + '](' + c.mediaLink + ')\n';
+          }
+          if (Array.isArray(c.videoUrls) && c.videoUrls.length > 0) {
+            c.videoUrls.forEach((v) => {
+              md += '- **Video:** ' + v + '\n';
+            });
+          }
+          md += '\n' + c.body + '\n\n';
+          if (Array.isArray(c.annotatedLinks) && c.annotatedLinks.length > 0) {
+            c.annotatedLinks.forEach((al) => {
+              md += '- [' + al.title + '](' + al.url + '): ' + al.description + '\n';
+            });
+            md += '\n';
+          }
+          if (c.literaryExcerpt) {
+            md += '> ' + c.literaryExcerpt.replace(/\n/g, '\n> ') + '\n\n';
+          }
+          if (c.hiddenLayer) {
+            md += '**Capa oculta:** ' + c.hiddenLayer + '\n\n';
+          }
+          if (Array.isArray(c.comments) && c.comments.length > 0) {
+            md += '**Comentarios de clase:**\n';
+            c.comments.forEach((cm) => {
+              md += '- *' + cm.author + '* (' + cm.date + '): ' + cm.text + '\n';
+            });
+            md += '\n';
+          }
+          md += '---\n\n';
+        });
+      });
+
+      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'RAE_Speranza_Lo_Que_No_Vemos_Tablero.md';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Archivo Markdown (.md) descargado.');
+    };
+
+    // Notificación flotante (Toast)
+    function showToast(message) {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = 'px-4 py-2.5 rounded-xl bg-slate-900 border border-amber-400/50 text-amber-100 text-xs font-medium shadow-xl backdrop-blur-md transition-opacity duration-300';
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3200);
+    }
+
+    // Cerrar modales con tecla Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeDetailModal();
+        closeCreateModal();
+        closeResetModal();
+      }
+    });
+
+    // Inicialización
+    window.addEventListener('DOMContentLoaded', () => {
+      loadCardsFromStorage();
+      renderBoard();
+    });
+  </script>
+</body>
+</html>
